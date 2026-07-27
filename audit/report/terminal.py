@@ -30,6 +30,39 @@ _RESET = "\033[0m"
 _BOLD = "\033[1m"
 _DIM = "\033[90m"
 
+# Typography that reads well in the HTML report but arrives as mojibake on a Windows console
+# using a legacy code page (cp1252 / cp437). Substituted only when stdout cannot encode it.
+_ASCII_SUBSTITUTIONS = {
+    "·": "-",      # ·
+    "—": "--",     # —
+    "–": "-",      # –
+    "×": "x",      # ×
+    "≥": ">=",     # ≥
+    "≤": "<=",     # ≤
+    "’": "'",      # ’
+    "‘": "'",      # ‘
+    "“": '"',      # “
+    "”": '"',      # ”
+    "…": "...",    # …
+    "✓": "OK",     # ✓
+    " ": " ",      # non-breaking space
+}
+
+
+def _encodable(text: str, encoding: str) -> bool:
+    try:
+        text.encode(encoding)
+    except (UnicodeEncodeError, LookupError):
+        return False
+    return True
+
+
+def to_ascii(text: str) -> str:
+    """Replace typographic characters with ASCII equivalents."""
+    for source, replacement in _ASCII_SUBSTITUTIONS.items():
+        text = text.replace(source, replacement)
+    return text
+
 
 def supports_color(stream=None) -> bool:
     stream = stream or sys.stdout
@@ -68,23 +101,34 @@ def _wrap(text: str, indent: int, width: int = WIDTH) -> List[str]:
     return [" " * indent + line for line in lines]
 
 
-def render(result: AuditResult, color: bool = None) -> str:
+def render(result: AuditResult, color: bool = None, ascii_only: bool = None) -> str:
     if color is None:
         color = supports_color()
 
+    if ascii_only is None:
+        # Downgrade only when the console genuinely cannot render the characters.
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        ascii_only = not _encodable("·—≥✓", encoding)
+
     def paint(text: str, code: str) -> str:
         return f"{code}{text}{_RESET}" if color else text
+
+    def conv(text: str) -> str:
+        """Normalise before wrapping, so substitutions cannot push a line over WIDTH."""
+        return to_ascii(text) if ascii_only else text
+
+    sep = "-" if ascii_only else "·"
 
     out: List[str] = []
     out.append("=" * WIDTH)
     out.append(paint("  WEBSITE QA AUDIT", _BOLD))
     out.append("=" * WIDTH)
-    out.append(f"  URL        {result.final_url}")
+    out.append(f"  URL        {conv(result.final_url)}")
     if result.was_redirected:
-        out.append(f"  Requested  {result.url}  (redirected)")
-    out.append(f"  Title      {result.page_title}")
+        out.append(f"  Requested  {conv(result.url)}  (redirected)")
+    out.append(f"  Title      {conv(result.page_title)}")
     out.append(
-        f"  Response   HTTP {result.status} · {result.elapsed_ms} ms · "
+        f"  Response   HTTP {result.status} {sep} {result.elapsed_ms} ms {sep} "
         f"{result.byte_size / 1024:.1f} KB"
     )
     out.append(f"  Scanned    {result.fetched_at}")
@@ -112,8 +156,10 @@ def render(result: AuditResult, color: bool = None) -> str:
         out.append("-" * WIDTH)
 
         if pack.stats:
-            stat_line = " · ".join(f"{k.replace('_', ' ')}: {v}" for k, v in pack.stats.items())
-            out.extend(_wrap(stat_line, indent=2))
+            stat_line = f" {sep} ".join(
+                f"{k.replace('_', ' ')}: {v}" for k, v in pack.stats.items()
+            )
+            out.extend(_wrap(conv(stat_line), indent=2))
             out.append("")
 
         if not pack.findings:
@@ -123,13 +169,13 @@ def render(result: AuditResult, color: bool = None) -> str:
 
         for finding in pack.findings:
             badge = f"[{SEVERITY_LABEL[finding.severity]}]"
-            out.append(f"  {paint(badge, _ANSI[finding.severity])} {finding.title}")
+            out.append(f"  {paint(badge, _ANSI[finding.severity])} {conv(finding.title)}")
             out.append(paint(f"      rule: {finding.rule}", _DIM) if color else f"      rule: {finding.rule}")
 
             if finding.detail:
-                out.extend(_wrap(finding.detail, indent=6))
+                out.extend(_wrap(conv(finding.detail), indent=6))
             if finding.recommendation:
-                out.extend(_wrap("Fix: " + finding.recommendation, indent=6))
+                out.extend(_wrap(conv("Fix: " + finding.recommendation), indent=6))
             out.append("")
 
     out.append("=" * WIDTH)

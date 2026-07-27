@@ -142,6 +142,23 @@ class TestTerminalReport(unittest.TestCase):
         overlong = [line for line in text.splitlines() if len(line) > terminal_report.WIDTH + 2]
         self.assertEqual(overlong, [], f"unwrapped lines: {overlong[:3]}")
 
+    def test_ascii_mode_output_is_encodable_on_legacy_code_pages(self):
+        """A Windows console on cp1252/cp437 renders '·' and '—' as mojibake."""
+        text = terminal_report.render(self.result, color=False, ascii_only=True)
+        for encoding in ("cp1252", "cp437", "ascii"):
+            with self.subTest(encoding=encoding):
+                text.encode(encoding)  # raises UnicodeEncodeError on failure
+
+    def test_ascii_mode_still_respects_wrap_width(self):
+        """Substitutions lengthen text ('—' -> '--'), so they must precede wrapping."""
+        text = terminal_report.render(self.result, color=False, ascii_only=True)
+        overlong = [line for line in text.splitlines() if len(line) > terminal_report.WIDTH + 2]
+        self.assertEqual(overlong, [], f"unwrapped lines: {overlong[:3]}")
+
+    def test_unicode_mode_keeps_typography(self):
+        text = terminal_report.render(self.result, color=False, ascii_only=False)
+        self.assertIn("·", text)
+
 
 if __name__ == "__main__":
     unittest.main()
