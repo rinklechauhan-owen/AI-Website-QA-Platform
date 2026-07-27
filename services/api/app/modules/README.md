@@ -1,9 +1,30 @@
 # Audit modules
 
 One module per PRD §5 module. All of them are currently stubs that raise
-`NotImplementedError`; the orchestrator in [`app/tasks/scan_tasks.py`](../tasks/scan_tasks.py)
-logs and skips those, so partial implementation is safe — implement modules one at a time
-and scans keep working.
+`NotImplementedError`. The orchestrator in [`app/tasks/scan_tasks.py`](../tasks/scan_tasks.py)
+logs and skips that for the audit modules, so partial implementation is safe — implement them
+one at a time and scans keep working. The one exception is `crawl`: it runs before the
+skip-handler because every other module consumes its output, so an unimplemented crawl fails
+the whole scan by design.
+
+## Reuse the existing rule engine
+
+The repository already contains a working, dependency-free rule engine at
+[`audit/`](../../../../audit/) covering SEO, image, and link checks. **Wrap it, do not
+reimplement it:**
+
+```python
+from audit.parse import parse
+from audit.rules import seo as seo_rules
+
+findings, stats = seo_rules.run(parse(page.html, page.url))
+```
+
+Those rules operate on a single parsed document. What belongs at *this* layer is everything
+they cannot see: site-wide context (sitemap, robots.txt, cross-page duplicates, page depth),
+anything requiring the rendered DOM (Playwright), and anything requiring the assets themselves
+(real image byte sizes, Lighthouse). Rule IDs must stay identical across both layers so
+historical comparison keeps working.
 
 ## Contract
 

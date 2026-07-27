@@ -44,6 +44,11 @@ screenshots/
 lighthouse-reports/
 *.lighthouse.json
 
+# Ad-hoc CLI report output. examples/sample-report.html is committed deliberately and
+# must stay tracked, so this is scoped to the default output name only.
+/qa-report.html
+/report.html
+
 # Playwright
 playwright-report/
 test-results/

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA Audit — Home</title>
+<style>
+* { box-sizing: border-box; }
+
+:root {
+  color-scheme: light dark;
+  --bg: #f7f8fa;
+  --card: #ffffff;
+  --border: #e4e7ec;
+  --ink: #101828;
+  --ink-muted: #667085;
+  --ink-faint: #98a2b3;
+  --accent: #2563eb;
+  --critical: #b42318;
+  --high: #d92d20;
+  --medium: #dc6803;
+  --low: #0e7490;
+  --info: #667085;
+  --good: #12b76a;
+  --warn: #f79009;
+  --bad: #f04438;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c111d;
+    --card: #161b26;
+    --border: #262b37;
+    --ink: #f5f5f6;
+    --ink-muted: #94969c;
+    --ink-faint: #6c6f7a;
+    --accent: #60a5fa;
+    --critical: #fda29b;
+    --high: #f97066;
+    --medium: #fdb022;
+    --low: #67e8f9;
+    --info: #94969c;
+    --shadow: none;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 40px 20px 72px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 940px; margin: 0 auto; }
+
+/* --- header --- */
+.head { display: flex; flex-wrap: wrap; gap: 28px; align-items: center;
+        background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+        padding: 28px; box-shadow: var(--shadow); }
+.head-main { flex: 1 1 380px; min-width: 0; }
+.eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+           color: var(--ink-faint); font-weight: 600; margin: 0 0 8px; }
+h1 { font-size: 21px; line-height: 1.3; margin: 0 0 6px; font-weight: 650; word-break: break-word; }
+.url { margin: 0 0 14px; font-size: 13px; word-break: break-all; }
+.url a { color: var(--accent); text-decoration: none; }
+.url a:hover { text-decoration: underline; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; font-size: 12.5px;
+         color: var(--ink-muted); list-style: none; padding: 0; }
+.facts b { color: var(--ink); font-weight: 600; }
+
+/* --- score ring --- */
+.ring { position: relative; width: 128px; height: 128px; flex: 0 0 auto; }
+.ring svg { transform: rotate(-90deg); }
+.ring-track { stroke: var(--border); }
+.ring-val { stroke-linecap: round; }
+.ring-text { position: absolute; inset: 0; display: flex; flex-direction: column;
+             align-items: center; justify-content: center; }
+.ring-num { font-size: 31px; font-weight: 680; letter-spacing: -.02em; line-height: 1; }
+.ring-of { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase;
+           letter-spacing: .08em; margin-top: 5px; }
+
+/* --- severity chips --- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+.chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 6px 13px;
+        border-radius: 999px; border: 1px solid var(--border); background: var(--card);
+        font-size: 12.5px; color: var(--ink-muted); }
+.chip b { font-size: 14px; font-weight: 660; }
+.chip.critical b { color: var(--critical); }
+.chip.high b { color: var(--high); }
+.chip.medium b { color: var(--medium); }
+.chip.low b { color: var(--low); }
+.chip.info b { color: var(--info); }
+
+/* --- pack summary cards --- */
+.packs { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+         gap: 12px; margin: 12px 0 0; }
+.pack-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+             padding: 16px 18px; box-shadow: var(--shadow); }
+.pack-card .name { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+                   color: var(--ink-faint); font-weight: 600; }
+.pack-card .val { font-size: 26px; font-weight: 660; letter-spacing: -.02em; margin: 6px 0 10px; }
+.meter { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 999px; }
+.pack-card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 9px; }
+
+/* --- sections --- */
+section { margin-top: 40px; }
+h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
+     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.count-pill { font-size: 11.5px; font-weight: 600; color: var(--ink-muted);
+              background: var(--bg); border: 1px solid var(--border);
+              padding: 2px 9px; border-radius: 999px; }
+.section-note { margin: 0 0 16px; font-size: 12.5px; color: var(--ink-muted); }
+
+/* --- stats --- */
+.stats { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }
+.stats li { font-size: 12px; color: var(--ink-muted); background: var(--card);
+            border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; }
+.stats b { color: var(--ink); font-weight: 620; }
+
+/* --- findings --- */
+.finding { background: var(--card); border: 1px solid var(--border);
+           border-left: 3px solid var(--border); border-radius: 10px;
+           padding: 16px 18px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.finding.critical { border-left-color: var(--critical); }
+.finding.high     { border-left-color: var(--high); }
+.finding.medium   { border-left-color: var(--medium); }
+.finding.low      { border-left-color: var(--low); }
+.finding.info     { border-left-color: var(--info); }
+
+.f-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+         padding: 3px 8px; border-radius: 5px; flex: 0 0 auto; color: #fff; }
+.badge.critical { background: var(--critical); }
+.badge.high     { background: var(--high); }
+.badge.medium   { background: var(--medium); }
+.badge.low      { background: var(--low); }
+.badge.info     { background: var(--info); }
+@media (prefers-color-scheme: dark) { .badge { color: #0c111d; } }
+
+.f-title { font-weight: 600; font-size: 14.5px; flex: 1 1 260px; min-width: 0;
+           word-break: break-word; }
+.f-rule { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 11.5px; color: var(--ink-faint); }
+.f-detail { margin: 9px 0 0; font-size: 13.5px; color: var(--ink-muted); word-break: break-word; }
+.f-el { margin: 10px 0 0; padding: 9px 11px; background: var(--bg); border: 1px solid var(--border);
+        border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px; color: var(--ink-muted); overflow-x: auto; white-space: pre-wrap;
+        word-break: break-all; }
+.f-fix { margin: 11px 0 0; padding-left: 12px; border-left: 2px solid var(--border);
+         font-size: 13.5px; }
+.f-fix b { font-weight: 620; }
+
+.clean { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+         padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
+.clean b { color: var(--good); }
+
+footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
+         font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
+footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+@media (max-width: 600px) {
+  body { padding: 20px 14px 48px; }
+  .head { padding: 20px; gap: 20px; }
+  .ring { width: 104px; height: 104px; }
+  .ring-num { font-size: 26px; }
+}
+
+@media print {
+  body { background: #fff; padding: 0; }
+  .finding, .pack-card, .head { box-shadow: none; break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <div class="head-main">
+    <p class="eyebrow">Website QA Audit</p>
+    <h1>Home</h1>
+    <p class="url"><a href="https://northgate-studio.test/">https://northgate-studio.test/</a></p>
+    <ul class="facts">
+      <li><b>HTTP 200</b></li>
+      <li><b>142</b> ms</li>
+      <li><b>2.0</b> KB</li>
+      <li><b>21</b> findings</li>
+      <li>Scanned <b>2026-07-27T19:19:26+00:00</b></li>
+    </ul>
+  </div>
+  <div class="ring">
+  <svg width="128" height="128" viewBox="0 0 100 100" aria-hidden="true">
+    <circle class="ring-track" cx="50" cy="50" r="42" fill="none" stroke-width="8"/>
+    <circle class="ring-val" cx="50" cy="50" r="42" fill="none" stroke-width="8"
+            stroke="var(--bad)"
+            stroke-dasharray="263.894"
+            stroke-dashoffset="145.142"/>
+  </svg>
+  <div class="ring-text">
+    <div class="ring-num">45</div>
+    <div class="ring-of">of 100</div>
+  </div>
+</div>
+</header>
+
+<div class="chips">
+  <span class="chip high"><b>4</b> High</span> <span class="chip medium"><b>8</b> Medium</span> <span class="chip low"><b>7</b> Low</span> <span class="chip info"><b>2</b> Info</span>
+</div>
+
+<div class="packs">
+<div class="pack-card">
+  <div class="name">SEO</div>
+  <div class="val" style="color:var(--bad)">44</div>
+  <div class="meter"><span style="width:44.0%;
+       background:var(--bad)"></span></div>
+  <div class="sub">11 issues</div>
+</div>
+<div class="pack-card">
+  <div class="name">Images</div>
+  <div class="val" style="color:var(--bad)">46</div>
+  <div class="meter"><span style="width:46.0%;
+       background:var(--bad)"></span></div>
+  <div class="sub">10 issues</div>
+</div>
+</div>
+
+<section>
+  <h2>SEO <span class="count-pill">11 findings</span><span class="count-pill">44/100</span></h2>
+  <ul class="stats">
+    <li>title length <b>4</b></li>
+    <li>description length <b>0</b></li>
+    <li>h1 count <b>2</b></li>
+    <li>heading count <b>7</b></li>
+    <li>internal links <b>7</b></li>
+    <li>external links <b>0</b></li>
+    <li>structured data blocks <b>0</b></li>
+    <li>text length <b>776</b></li>
+  </ul>
+<article class="finding high">
+  <div class="f-top">
+    <span class="badge high">High</span>
+    <span class="f-title">Page has no meta description</span>
+    <span class="f-rule">seo.missing-meta-description</span>
+  </div>
+  <p class="f-detail">Without one, search engines synthesise a snippet from page copy, which usually reads poorly and lowers click-through rate.</p>
+  <p class="f-fix"><b>Fix:</b> Add a meta description of 50–160 characters that summarises the page and contains a call to action.</p>
+</article>
+<article class="finding high">
+  <div class="f-top">
+    <span class="badge high">High</span>
+    <span class="f-title">No viewport meta tag</span>
+    <span class="f-rule">seo.missing-viewport</span>
+  </div>
+  <p class="f-detail">Mobile browsers fall back to a desktop-width viewport and zoom out, so the page fails mobile usability checks.</p>
+  <p class="f-fix"><b>Fix:</b> Add &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">No canonical URL declared</span>
+    <span class="f-rule">seo.missing-canonical</span>
+  </div>
+  <p class="f-detail">Without a canonical, query strings and alternate paths can be indexed as separate duplicate pages.</p>
+  <p class="f-fix"><b>Fix:</b> Add &lt;link rel=&quot;canonical&quot; href=&quot;...&quot;&gt; pointing at the preferred absolute URL for this page.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">&lt;html&gt; has no lang attribute</span>
+    <span class="f-rule">seo.missing-lang</span>
+  </div>
+  <p class="f-detail">Screen readers use it to pick a pronunciation model, and search engines use it for language targeting.</p>
+  <p class="f-fix"><b>Fix:</b> Add a language code, e.g. &lt;html lang=&quot;en&quot;&gt;.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Page has 2 H1 elements</span>
+    <span class="f-rule">seo.multiple-h1</span>
+  </div>
+  <p class="f-detail">Found: &#x27;We build brands that people remember&#x27;; &#x27;Selected clients&#x27; (line 50)</p>
+  <p class="f-fix"><b>Fix:</b> Keep one H1 and demote the rest to H2 so the outline has a single top-level topic.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Title is only 4 characters</span>
+    <span class="f-rule">seo.title-too-short</span>
+  </div>
+  <p class="f-detail">Current title: &#x27;Home&#x27;</p>
+  <div class="f-el">Home</div>
+  <p class="f-fix"><b>Fix:</b> Expand to at least 15 characters to describe the page and include the brand name.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">Heading jumps from H1 to H3</span>
+    <span class="f-rule">seo.heading-level-skip</span>
+  </div>
+  <p class="f-detail">Heading text: &#x27;What we do&#x27; (line 34)</p>
+  <div class="f-el">What we do</div>
+  <p class="f-fix"><b>Fix:</b> Use H2 here, or restructure the section so heading levels descend one at a time.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">Missing Open Graph tag(s): og:title, og:description, og:image</span>
+    <span class="f-rule">seo.missing-open-graph</span>
+  </div>
+  <p class="f-detail">Open Graph controls the preview card when the page is shared on social platforms and in messaging apps.</p>
+  <p class="f-fix"><b>Fix:</b> Add the missing og: properties. og:image should be at least 1200×630 for a large preview card.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">No JSON-LD structured data found</span>
+    <span class="f-rule">seo.no-structured-data</span>
+  </div>
+  <p class="f-detail">Structured data is what makes rich results (breadcrumbs, FAQs, ratings) eligible to appear.</p>
+  <p class="f-fix"><b>Fix:</b> Add schema.org JSON-LD appropriate to the page type — Organization and BreadcrumbList are the usual baseline.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">2 link(s) use non-descriptive anchor text</span>
+    <span class="f-rule">seo.non-descriptive-link-text</span>
+  </div>
+  <p class="f-detail">Examples: &#x27;Click here&#x27; -&gt; https://northgate-studio.test/contact; &#x27;read more&#x27; -&gt; http://northgate-studio.test/legacy-brochure.pdf (line 57)</p>
+  <p class="f-fix"><b>Fix:</b> Describe the destination in the link text. Anchor text is a ranking signal and the primary way screen-reader users scan links.</p>
+</article>
+<article class="finding info">
+  <div class="f-top">
+    <span class="badge info">Info</span>
+    <span class="f-title">No Twitter/X card metadata</span>
+    <span class="f-rule">seo.missing-twitter-card</span>
+  </div>
+  <p class="f-fix"><b>Fix:</b> Add &lt;meta name=&quot;twitter:card&quot; content=&quot;summary_large_image&quot;&gt; to control the shared preview.</p>
+</article>
+</section>
+<section>
+  <h2>Images <span class="count-pill">10 findings</span><span class="count-pill">46/100</span></h2>
+  <ul class="stats">
+    <li>total images <b>7</b></li>
+    <li>missing alt <b>2</b></li>
+    <li>empty alt <b>1</b></li>
+    <li>generic alt <b>4</b></li>
+    <li>modern format <b>0</b></li>
+    <li>lazy loaded <b>0</b></li>
+    <li>with dimensions <b>0</b></li>
+  </ul>
+<article class="finding high">
+  <div class="f-top">
+    <span class="badge high">High</span>
+    <span class="f-title">Image has no alt attribute: hero-banner.png</span>
+    <span class="f-rule">image.missing-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/hero-banner.png (line 26)</p>
+  <div class="f-el">&lt;img src=&quot;hero-banner.png&quot;&gt;</div>
+  <p class="f-fix"><b>Fix:</b> Add alt text describing the image&#x27;s purpose. Screen readers announce the filename instead when alt is absent, which is close to useless. If the image is purely decorative, use alt=&quot;&quot; so it is skipped deliberately.</p>
+</article>
+<article class="finding high">
+  <div class="f-top">
+    <span class="badge high">High</span>
+    <span class="f-title">Image has no alt attribute: case-03.jpg</span>
+    <span class="f-rule">image.missing-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/case-03.jpg (line 47)</p>
+  <div class="f-el">&lt;img src=&quot;case-03.jpg&quot;&gt;</div>
+  <p class="f-fix"><b>Fix:</b> Add alt text describing the image&#x27;s purpose. Screen readers announce the filename instead when alt is absent, which is close to useless. If the image is purely decorative, use alt=&quot;&quot; so it is skipped deliberately.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Alt text is generic: &#x27;logo&#x27; on logo.png</span>
+    <span class="f-rule">image.generic-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/logo.png (line 15)</p>
+  <div class="f-el">alt=&quot;logo&quot;</div>
+  <p class="f-fix"><b>Fix:</b> Describe what the image shows and why it is on the page. &#x27;logo&#x27; conveys no more than an empty alt would.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Alt text is generic: &#x27;image&#x27; on case-01.jpg</span>
+    <span class="f-rule">image.generic-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/case-01.jpg (line 39)</p>
+  <div class="f-el">alt=&quot;image&quot;</div>
+  <p class="f-fix"><b>Fix:</b> Describe what the image shows and why it is on the page. &#x27;image&#x27; conveys no more than an empty alt would.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Alt text is generic: &#x27;photo&#x27; on case-02.jpg</span>
+    <span class="f-rule">image.generic-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/case-02.jpg (line 43)</p>
+  <div class="f-el">alt=&quot;photo&quot;</div>
+  <p class="f-fix"><b>Fix:</b> Describe what the image shows and why it is on the page. &#x27;photo&#x27; conveys no more than an empty alt would.</p>
+</article>
+<article class="finding medium">
+  <div class="f-top">
+    <span class="badge medium">Medium</span>
+    <span class="f-title">Alt text is generic: &#x27;banner&#x27; on clients.png</span>
+    <span class="f-rule">image.generic-alt</span>
+  </div>
+  <p class="f-detail">Source: https://northgate-studio.test/assets/clients.png (line 52)</p>
+  <div class="f-el">alt=&quot;banner&quot;</div>
+  <p class="f-fix"><b>Fix:</b> Describe what the image shows and why it is on the page. &#x27;banner&#x27; conveys no more than an empty alt would.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">7 image(s) served as PNG/JPEG with no modern alternative</span>
+    <span class="f-rule">image.legacy-format</span>
+  </div>
+  <p class="f-detail">Files: logo.png, hero-banner.png, case-01.jpg, case-02.jpg, case-03.jpg, clients.png, logo-footer.png (line 15)</p>
+  <p class="f-fix"><b>Fix:</b> Serve WebP or AVIF via &lt;picture&gt; or a srcset, keeping the original as fallback. Typical saving is 25–50% of transfer size at equal quality.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">7 image(s) declare no width/height</span>
+    <span class="f-rule">image.no-dimensions</span>
+  </div>
+  <p class="f-detail">Files: logo.png, hero-banner.png, case-01.jpg, case-02.jpg, case-03.jpg, clients.png, logo-footer.png (line 15)</p>
+  <p class="f-fix"><b>Fix:</b> Set width and height attributes so the browser can reserve space before the image loads. Missing dimensions are a leading cause of Cumulative Layout Shift.</p>
+</article>
+<article class="finding low">
+  <div class="f-top">
+    <span class="badge low">Low</span>
+    <span class="f-title">5 below-the-fold image(s) load eagerly</span>
+    <span class="f-rule">image.no-lazy-loading</span>
+  </div>
+  <p class="f-detail">Files: case-01.jpg, case-02.jpg, case-03.jpg, clients.png, logo-footer.png (line 39)</p>
+  <p class="f-fix"><b>Fix:</b> Add loading=&quot;lazy&quot; to images below the fold so they do not compete with the initial render. Leave the hero image eager — lazy-loading it delays LCP.</p>
+</article>
+<article class="finding info">
+  <div class="f-top">
+    <span class="badge info">Info</span>
+    <span class="f-title">1 image(s) use alt=&quot;&quot; (decorative)</span>
+    <span class="f-rule">image.empty-alt</span>
+  </div>
+  <p class="f-detail">Files: logo-footer.png (line 64)</p>
+  <p class="f-fix"><b>Fix:</b> alt=&quot;&quot; is correct for decorative images and screen readers will skip them. Confirm none of these actually carry meaning.</p>
+</article>
+</section>
+
+<footer>
+  Generated by <code>python -m audit</code> from the
+  <b>AI Website QA Platform</b> &mdash; a dependency-free static HTML audit engine
+  (Python standard library only, no third-party packages).<br>
+  Scope of this run: SEO metadata, heading structure, image accessibility and optimisation
+  hints, and&mdash;when enabled&mdash;link reachability. Lighthouse performance metrics,
+  axe-core accessibility rules, rendered-DOM inspection, and visual/design review require
+  the browser-based modules and are <b>not</b> part of this report.
+</footer>
+
+</div>
+</body>
+</html>

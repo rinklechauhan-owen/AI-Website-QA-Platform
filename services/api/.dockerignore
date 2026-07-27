@@ -1,0 +1,26 @@
+# Never bake secrets or local state into an image. The Dockerfile's `COPY . .` would
+# otherwise pick up a developer's .env and virtualenv.
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+storage/
+artifacts/
+screenshots/
+
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md
