@@ -159,6 +159,28 @@ class TestTerminalReport(unittest.TestCase):
         text = terminal_report.render(self.result, color=False, ascii_only=False)
         self.assertIn("·", text)
 
+    def test_page_controlled_text_is_transliterated(self):
+        """Titles and alt text come from the audited page and can hold any character."""
+        self.assertEqual(terminal_report.to_ascii("About Python™"), "About PythonTM")
+        self.assertEqual(terminal_report.to_ascii("Café Crème"), "Cafe Creme")
+        self.assertEqual(terminal_report.to_ascii("naïve — résumé"), "naive -- resume")
+
+    def test_untranslatable_characters_become_placeholders_not_mojibake(self):
+        result = terminal_report.to_ascii("東京")  # CJK has no ASCII equivalent
+        self.assertEqual(result, "??")
+        result.encode("ascii")
+
+    def test_arbitrary_unicode_title_survives_ascii_rendering(self):
+        from audit.engine import audit_response
+
+        html = '<html lang="en"><head><title>Café Python™ — 東京</title>' \
+               "</head><body><h1>x</h1></body></html>"
+        rendered = terminal_report.render(
+            audit_response(response(html), "https://acme.test/"), color=False, ascii_only=True
+        )
+        rendered.encode("cp437")
+        self.assertIn("Cafe PythonTM", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

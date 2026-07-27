@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import unicodedata
 from typing import List
 
 from audit.engine import AuditResult
@@ -58,10 +59,18 @@ def _encodable(text: str, encoding: str) -> bool:
 
 
 def to_ascii(text: str) -> str:
-    """Replace typographic characters with ASCII equivalents."""
+    """Reduce text to ASCII, keeping as much meaning as possible.
+
+    The explicit table handles our own punctuation. Everything else is page-controlled — a
+    title can hold anything at all — so the remainder goes through NFKD decomposition, which
+    turns 'é' into 'e' and '™' into 'TM', before unrepresentable characters become '?'.
+    """
     for source, replacement in _ASCII_SUBSTITUTIONS.items():
         text = text.replace(source, replacement)
-    return text
+
+    decomposed = unicodedata.normalize("NFKD", text)
+    without_marks = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return without_marks.encode("ascii", errors="replace").decode("ascii")
 
 
 def supports_color(stream=None) -> bool:
