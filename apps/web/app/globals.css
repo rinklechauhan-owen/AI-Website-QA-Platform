@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Tailwind v4 requires @theme at the top level — dark mode overrides the generated
+   custom properties below rather than declaring a second @theme block. */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7f9;
+  --color-border-subtle: #e4e7ec;
+  --color-ink: #101828;
+  --color-ink-muted: #667085;
+
+  /* Severity colours, shared by the dashboard, findings list, and exports. */
+  --color-severity-critical: #b42318;
+  --color-severity-high: #d92d20;
+  --color-severity-medium: #dc6803;
+  --color-severity-low: #eaaa08;
+  --color-severity-info: #475467;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #0c111d;
+    --color-surface-muted: #161b26;
+    --color-border-subtle: #1f242f;
+    --color-ink: #f5f5f6;
+    --color-ink-muted: #94969c;
+  }
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+}
