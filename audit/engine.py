@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
+from audit import inventory as inventory_module
 from audit.fetch import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, FetchError, Response, fetch
 from audit.findings import (
     Finding,
@@ -14,6 +15,7 @@ from audit.findings import (
     score_from_findings,
     sort_findings,
 )
+from audit.inventory import PageInventory
 from audit.parse import Document, parse
 from audit.rules import images, links, seo
 
@@ -52,6 +54,9 @@ class AuditResult:
     byte_size: int
     packs: List[PackResult] = field(default_factory=list)
     document: Optional[Document] = None
+    # Extracts rather than findings — content listing, structure outline, image alt
+    # inventory, suggested schema.org markup. None when the page could not be parsed.
+    inventory: Optional[PageInventory] = None
 
     @property
     def findings(self) -> List[Finding]:
@@ -81,7 +86,7 @@ class AuditResult:
         return self.final_url.rstrip("/") != self.url.rstrip("/")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "url": self.url,
             "final_url": self.final_url,
             "status": self.status,
@@ -93,6 +98,9 @@ class AuditResult:
             "counts": self.counts,
             "packs": [pack.to_dict() for pack in self.packs],
         }
+        if self.inventory is not None:
+            payload["inventory"] = self.inventory.to_dict()
+        return payload
 
 
 def _normalise_url(url: str) -> str:
@@ -108,6 +116,8 @@ def audit_url(
     timeout: int = DEFAULT_TIMEOUT,
     user_agent: str = DEFAULT_USER_AGENT,
     verify_tls: bool = True,
+    content_tags: Sequence[str] = inventory_module.DEFAULT_CONTENT_TAGS,
+    outline_depth: int = inventory_module.DEFAULT_MAX_OUTLINE_DEPTH,
 ) -> AuditResult:
     """Fetch and audit a single URL.
 
@@ -116,7 +126,16 @@ def audit_url(
     """
     url = _normalise_url(url)
     response = fetch(url, timeout=timeout, user_agent=user_agent, verify_tls=verify_tls)
-    return audit_response(response, url, check_links, max_links, timeout, verify_tls)
+    return audit_response(
+        response,
+        url,
+        check_links,
+        max_links,
+        timeout,
+        verify_tls,
+        content_tags=content_tags,
+        outline_depth=outline_depth,
+    )
 
 
 def audit_response(
@@ -126,6 +145,8 @@ def audit_response(
     max_links: int = links.DEFAULT_MAX_LINKS,
     timeout: int = DEFAULT_TIMEOUT,
     verify_tls: bool = True,
+    content_tags: Sequence[str] = inventory_module.DEFAULT_CONTENT_TAGS,
+    outline_depth: int = inventory_module.DEFAULT_MAX_OUTLINE_DEPTH,
 ) -> AuditResult:
     """Audit an already-fetched response. Split out so tests can supply fixtures."""
     result = AuditResult(
@@ -180,6 +201,9 @@ def audit_response(
 
     document = parse(response.body, response.url)
     result.document = document
+    result.inventory = inventory_module.build(
+        document, content_tags=content_tags, max_outline_depth=outline_depth
+    )
 
     for module in (seo, images):
         pack_findings, stats = module.run(document)

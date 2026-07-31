@@ -177,6 +177,61 @@ h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
          padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
 .clean b { color: var(--good); }
 
+/* --- inventory: content listing --- */
+.blocks { display: flex; flex-direction: column; gap: 1px; background: var(--border);
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.block { display: flex; gap: 12px; padding: 10px 14px; background: var(--card);
+         align-items: baseline; }
+.block .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              font-size: 11px; font-weight: 700; text-transform: uppercase; flex: 0 0 34px;
+              color: var(--ink-faint); }
+.block.h1 .tag, .block.h2 .tag, .block.h3 .tag { color: var(--accent); }
+.block .txt { flex: 1 1 auto; min-width: 0; font-size: 13.5px; word-break: break-word; }
+.block.h1 .txt { font-weight: 640; font-size: 15px; }
+.block.h2 .txt { font-weight: 620; }
+.block.h3 .txt { font-weight: 600; }
+.block.p .txt { color: var(--ink-muted); }
+.block .ln { flex: 0 0 auto; font-size: 11px; color: var(--ink-faint);
+             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* --- inventory: structure outline --- */
+.tree { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px 16px; overflow-x: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px; line-height: 1.75; }
+.tree div { white-space: pre; }
+.tree .t { color: var(--accent); }
+.tree .q { color: var(--ink-muted); }
+.tree .n { color: var(--ink-faint); }
+
+/* --- inventory: tables --- */
+table.grid { width: 100%; border-collapse: collapse; background: var(--card);
+             border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+             font-size: 13px; }
+table.grid th { text-align: left; font-size: 11px; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--ink-faint); font-weight: 600;
+                padding: 9px 14px; border-bottom: 1px solid var(--border); }
+table.grid td { padding: 9px 14px; border-bottom: 1px solid var(--border);
+                vertical-align: top; word-break: break-all; }
+table.grid tr:last-child td { border-bottom: none; }
+table.grid td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                     font-size: 12px; }
+.state { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+         padding: 2px 7px; border-radius: 4px; white-space: nowrap; color: #fff; }
+.state.missing { background: var(--high); }
+.state.empty { background: var(--medium); }
+@media (prefers-color-scheme: dark) { .state { color: #0c111d; } }
+.scroll-x { overflow-x: auto; }
+
+/* --- inventory: schema --- */
+pre.code { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+           padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
+           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+           color: var(--ink); margin: 0; }
+.notes { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: var(--ink-muted); }
+.notes li { margin-bottom: 4px; }
+.typerow { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
+
 footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
          font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
 footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -283,6 +338,151 @@ def _section(pack: PackResult) -> str:
     return "\n".join(parts)
 
 
+def _content_section(inventory) -> str:
+    content = inventory.content
+    counts = content.counts
+    summary = " · ".join(f"{count} &lt;{tag}&gt;" for tag, count in counts.items() if count)
+
+    parts = ["<section>"]
+    parts.append(
+        f'  <h2>Page content <span class="count-pill">{len(content.blocks)} blocks</span>'
+        f'<span class="count-pill">{content.total_words} words</span></h2>'
+    )
+    parts.append(
+        f'  <p class="section-note">Every heading and paragraph in document order. '
+        f"{summary or 'No matching content found.'}</p>"
+    )
+
+    if not content.blocks:
+        parts.append('  <div class="clean">No content blocks matched the selected tags.</div>')
+        parts.append("</section>")
+        return "\n".join(parts)
+
+    parts.append('  <div class="blocks">')
+    for block in content.blocks:
+        parts.append(
+            f'    <div class="block {block.tag}"><span class="tag">{block.tag}</span>'
+            f'<span class="txt">{escape(block.text)}</span>'
+            f'<span class="ln">L{block.line}</span></div>'
+        )
+    parts.append("  </div>")
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _outline_section(inventory) -> str:
+    outline = inventory.outline
+    parts = ["<section>"]
+    parts.append(
+        f'  <h2>Page structure <span class="count-pill">{outline.total_nodes} elements</span>'
+        f'<span class="count-pill">depth {outline.max_depth_seen}</span></h2>'
+    )
+
+    note = "Structural elements only — inline formatting is omitted so the page shape stays legible."
+    if outline.was_truncated:
+        dropped = outline.truncated_depth + outline.truncated_count
+        note += f" {dropped} deeper or later element(s) not shown."
+    parts.append(f'  <p class="section-note">{note}</p>')
+
+    if not outline.rows:
+        parts.append('  <div class="clean">No structural elements found.</div>')
+        parts.append("</section>")
+        return "\n".join(parts)
+
+    parts.append('  <div class="tree">')
+    for row in outline.rows:
+        indent = "  " * row.depth
+        children = (
+            f'<span class="n">  ({row.child_count})</span>' if row.child_count else ""
+        )
+        # Split the selector so the tag and its id/classes can be coloured separately.
+        tag_part = escape(row.tag)
+        rest = escape(row.selector[len(row.tag) :])
+        parts.append(
+            f'    <div>{indent}<span class="t">{tag_part}</span>'
+            f'<span class="q">{rest}</span>{children}</div>'
+        )
+    parts.append("  </div>")
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _image_alt_section(inventory) -> str:
+    images = inventory.images
+    flagged = images.needs_attention
+
+    parts = ["<section>"]
+    parts.append(
+        f'  <h2>Image alt text <span class="count-pill">{images.total} images</span>'
+        f'<span class="count-pill">{images.coverage:.0f}% described</span></h2>'
+    )
+    parts.append(
+        '  <p class="section-note">Source URLs for every image with no alt attribute or an '
+        'explicitly empty one. <code>alt=""</code> is correct for purely decorative images — '
+        "confirm each one genuinely carries no meaning.</p>"
+    )
+
+    if not flagged:
+        parts.append(
+            '  <div class="clean"><b>&#10003; Clean.</b> Every image has alt text.</div>'
+        )
+        parts.append("</section>")
+        return "\n".join(parts)
+
+    parts.append('  <div class="scroll-x"><table class="grid">')
+    parts.append(
+        "    <tr><th>State</th><th>Image source</th><th>Line</th><th>Dimensions</th></tr>"
+    )
+    for image in flagged:
+        state = image.alt_state
+        dimensions = (
+            f"{image.width}&times;{image.height}" if image.width and image.height else "—"
+        )
+        parts.append(
+            f'    <tr><td><span class="state {state}">{state}</span></td>'
+            f'<td class="mono">{escape(image.src or "(no src)")}</td>'
+            f"<td>{image.line}</td><td>{dimensions}</td></tr>"
+        )
+    parts.append("    </table></div>")
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _schema_section(inventory) -> str:
+    schema = inventory.schema
+    parts = ["<section>"]
+    parts.append(
+        f'  <h2>Suggested schema.org markup '
+        f'<span class="count-pill">{len(schema.suggested_types)} types</span></h2>'
+    )
+    parts.append(
+        '  <p class="section-note">Generated from what is actually on the page — no '
+        "placeholder values. Review before publishing; inaccurate structured data is worse "
+        "than none.</p>"
+    )
+
+    parts.append('  <div class="typerow">')
+    if schema.existing_types:
+        for name in schema.existing_types:
+            parts.append(f'    <span class="chip">already on page <b>{escape(name)}</b></span>')
+    else:
+        parts.append('    <span class="chip">no structured data <b>currently</b></span>')
+    for name in schema.suggested_types:
+        parts.append(f'    <span class="chip">suggested <b>{escape(name)}</b></span>')
+    parts.append("  </div>")
+
+    if schema.notes:
+        parts.append('  <ul class="notes">')
+        for note in schema.notes:
+            parts.append(f"    <li>{escape(note)}</li>")
+        parts.append("  </ul>")
+
+    # Escaped, never a live <script> — the report must not execute anything.
+    parts.append(f'  <pre class="code">{escape(schema.script_block)}</pre>')
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
 def render(result: AuditResult) -> str:
     counts = result.counts
     total = sum(counts.values())
@@ -310,6 +510,16 @@ def render(result: AuditResult) -> str:
 
     sections = "\n".join(_section(pack) for pack in result.packs)
     pack_cards = "\n".join(_pack_card(pack) for pack in result.packs)
+
+    if result.inventory is not None:
+        sections += "\n" + "\n".join(
+            (
+                _content_section(result.inventory),
+                _outline_section(result.inventory),
+                _image_alt_section(result.inventory),
+                _schema_section(result.inventory),
+            )
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -349,9 +559,11 @@ def render(result: AuditResult) -> str:
   <b>AI Website QA Platform</b> &mdash; a dependency-free static HTML audit engine
   (Python standard library only, no third-party packages).<br>
   Scope of this run: SEO metadata, heading structure, image accessibility and optimisation
-  hints, and&mdash;when enabled&mdash;link reachability. Lighthouse performance metrics,
-  axe-core accessibility rules, rendered-DOM inspection, and visual/design review require
-  the browser-based modules and are <b>not</b> part of this report.
+  hints, and&mdash;when enabled&mdash;link reachability, plus a content listing, structure
+  outline, image alt inventory, and generated schema.org markup. Analysis is of the
+  <b>served HTML</b>: Lighthouse performance metrics, axe-core accessibility rules,
+  JavaScript-rendered content, and visual/design review require the browser-based modules
+  and are <b>not</b> part of this report.
 </footer>
 
 </div>

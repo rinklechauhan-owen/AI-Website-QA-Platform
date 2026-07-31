@@ -158,6 +158,61 @@ h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
          padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
 .clean b { color: var(--good); }
 
+/* --- inventory: content listing --- */
+.blocks { display: flex; flex-direction: column; gap: 1px; background: var(--border);
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.block { display: flex; gap: 12px; padding: 10px 14px; background: var(--card);
+         align-items: baseline; }
+.block .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              font-size: 11px; font-weight: 700; text-transform: uppercase; flex: 0 0 34px;
+              color: var(--ink-faint); }
+.block.h1 .tag, .block.h2 .tag, .block.h3 .tag { color: var(--accent); }
+.block .txt { flex: 1 1 auto; min-width: 0; font-size: 13.5px; word-break: break-word; }
+.block.h1 .txt { font-weight: 640; font-size: 15px; }
+.block.h2 .txt { font-weight: 620; }
+.block.h3 .txt { font-weight: 600; }
+.block.p .txt { color: var(--ink-muted); }
+.block .ln { flex: 0 0 auto; font-size: 11px; color: var(--ink-faint);
+             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* --- inventory: structure outline --- */
+.tree { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px 16px; overflow-x: auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px; line-height: 1.75; }
+.tree div { white-space: pre; }
+.tree .t { color: var(--accent); }
+.tree .q { color: var(--ink-muted); }
+.tree .n { color: var(--ink-faint); }
+
+/* --- inventory: tables --- */
+table.grid { width: 100%; border-collapse: collapse; background: var(--card);
+             border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+             font-size: 13px; }
+table.grid th { text-align: left; font-size: 11px; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--ink-faint); font-weight: 600;
+                padding: 9px 14px; border-bottom: 1px solid var(--border); }
+table.grid td { padding: 9px 14px; border-bottom: 1px solid var(--border);
+                vertical-align: top; word-break: break-all; }
+table.grid tr:last-child td { border-bottom: none; }
+table.grid td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                     font-size: 12px; }
+.state { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+         padding: 2px 7px; border-radius: 4px; white-space: nowrap; color: #fff; }
+.state.missing { background: var(--high); }
+.state.empty { background: var(--medium); }
+@media (prefers-color-scheme: dark) { .state { color: #0c111d; } }
+.scroll-x { overflow-x: auto; }
+
+/* --- inventory: schema --- */
+pre.code { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+           padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
+           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+           color: var(--ink); margin: 0; }
+.notes { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: var(--ink-muted); }
+.notes li { margin-bottom: 4px; }
+.typerow { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
+
 footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
          font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
 footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -188,7 +243,7 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       <li><b>142</b> ms</li>
       <li><b>2.0</b> KB</li>
       <li><b>21</b> findings</li>
-      <li>Scanned <b>2026-07-27T19:19:26+00:00</b></li>
+      <li>Scanned <b>2026-07-31T18:06:05+00:00</b></li>
     </ul>
   </div>
   <div class="ring">
@@ -448,15 +503,114 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   <p class="f-fix"><b>Fix:</b> alt=&quot;&quot; is correct for decorative images and screen readers will skip them. Confirm none of these actually carry meaning.</p>
 </article>
 </section>
+<section>
+  <h2>Page content <span class="count-pill">10 blocks</span><span class="count-pill">118 words</span></h2>
+  <p class="section-note">Every heading and paragraph in document order. 2 &lt;h1&gt; · 1 &lt;h2&gt; · 1 &lt;h3&gt; · 6 &lt;p&gt;</p>
+  <div class="blocks">
+    <div class="block h1"><span class="tag">h1</span><span class="txt">We build brands that people remember</span><span class="ln">L24</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Northgate Studio is a design and build studio working with challenger brands across retail, hospitality and professional services. We handle strategy, identity, and the websites that carry them.</span><span class="ln">L28</span></div>
+    <div class="block h3"><span class="tag">h3</span><span class="txt">What we do</span><span class="ln">L34</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Naming, logo systems, typography and the guidelines that keep it all consistent.</span><span class="ln">L38</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Design and build on a stack your team can actually maintain after we hand it over.</span><span class="ln">L42</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Launch assets, paid social creative, and the reporting to show whether it worked.</span><span class="ln">L46</span></div>
+    <div class="block h1"><span class="tag">h1</span><span class="txt">Selected clients</span><span class="ln">L50</span></div>
+    <div class="block h2"><span class="tag">h2</span><span class="txt">Ready to start?</span><span class="ln">L54</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Tell us what you are working on and we will come back within two working days. Click here to get in touch, or read more about how we work.</span><span class="ln">L55</span></div>
+    <div class="block p"><span class="tag">p</span><span class="txt">Northgate Studio, 14 Bridge Street, Manchester</span><span class="ln">L65</span></div>
+  </div>
+</section>
+<section>
+  <h2>Page structure <span class="count-pill">27 elements</span><span class="count-pill">depth 4</span></h2>
+  <p class="section-note">Structural elements only — inline formatting is omitted so the page shape stays legible.</p>
+  <div class="tree">
+    <div><span class="t">html</span><span class="q"></span><span class="n">  (1)</span></div>
+    <div>  <span class="t">body</span><span class="q"></span><span class="n">  (3)</span></div>
+    <div>    <span class="t">header</span><span class="q"></span><span class="n">  (2)</span></div>
+    <div>      <span class="t">img</span><span class="q"></span></div>
+    <div>      <span class="t">nav</span><span class="q"></span></div>
+    <div>    <span class="t">main</span><span class="q"></span><span class="n">  (9)</span></div>
+    <div>      <span class="t">h1</span><span class="q"></span></div>
+    <div>      <span class="t">img</span><span class="q"></span></div>
+    <div>      <span class="t">p</span><span class="q"></span></div>
+    <div>      <span class="t">h3</span><span class="q"></span></div>
+    <div>      <span class="t">section</span><span class="q"></span><span class="n">  (9)</span></div>
+    <div>        <span class="t">h4</span><span class="q"></span></div>
+    <div>        <span class="t">p</span><span class="q"></span></div>
+    <div>        <span class="t">img</span><span class="q"></span></div>
+    <div>        <span class="t">h4</span><span class="q"></span></div>
+    <div>        <span class="t">p</span><span class="q"></span></div>
+    <div>        <span class="t">img</span><span class="q"></span></div>
+    <div>        <span class="t">h4</span><span class="q"></span></div>
+    <div>        <span class="t">p</span><span class="q"></span></div>
+    <div>        <span class="t">img</span><span class="q"></span></div>
+    <div>      <span class="t">h1</span><span class="q"></span></div>
+    <div>      <span class="t">img</span><span class="q"></span></div>
+    <div>      <span class="t">h2</span><span class="q"></span></div>
+    <div>      <span class="t">p</span><span class="q"></span></div>
+    <div>    <span class="t">footer</span><span class="q"></span><span class="n">  (2)</span></div>
+    <div>      <span class="t">img</span><span class="q"></span></div>
+    <div>      <span class="t">p</span><span class="q"></span></div>
+  </div>
+</section>
+<section>
+  <h2>Image alt text <span class="count-pill">7 images</span><span class="count-pill">57% described</span></h2>
+  <p class="section-note">Source URLs for every image with no alt attribute or an explicitly empty one. <code>alt=""</code> is correct for purely decorative images — confirm each one genuinely carries no meaning.</p>
+  <div class="scroll-x"><table class="grid">
+    <tr><th>State</th><th>Image source</th><th>Line</th><th>Dimensions</th></tr>
+    <tr><td><span class="state missing">missing</span></td><td class="mono">https://northgate-studio.test/assets/hero-banner.png</td><td>26</td><td>—</td></tr>
+    <tr><td><span class="state missing">missing</span></td><td class="mono">https://northgate-studio.test/assets/case-03.jpg</td><td>47</td><td>—</td></tr>
+    <tr><td><span class="state empty">empty</span></td><td class="mono">https://northgate-studio.test/assets/logo-footer.png</td><td>64</td><td>—</td></tr>
+    </table></div>
+</section>
+<section>
+  <h2>Suggested schema.org markup <span class="count-pill">2 types</span></h2>
+  <p class="section-note">Generated from what is actually on the page — no placeholder values. Review before publishing; inaccurate structured data is worse than none.</p>
+  <div class="typerow">
+    <span class="chip">no structured data <b>currently</b></span>
+    <span class="chip">suggested <b>Organization</b></span>
+    <span class="chip">suggested <b>WebPage</b></span>
+  </div>
+  <ul class="notes">
+    <li>Page has no meta description, so WebPage.description was left out.</li>
+  </ul>
+  <pre class="code">&lt;script type=&quot;application/ld+json&quot;&gt;
+{
+  &quot;@context&quot;: &quot;https://schema.org&quot;,
+  &quot;@graph&quot;: [
+    {
+      &quot;@type&quot;: &quot;Organization&quot;,
+      &quot;@id&quot;: &quot;https://northgate-studio.test/#organization&quot;,
+      &quot;name&quot;: &quot;northgate-studio.test&quot;,
+      &quot;url&quot;: &quot;https://northgate-studio.test/&quot;,
+      &quot;logo&quot;: {
+        &quot;@type&quot;: &quot;ImageObject&quot;,
+        &quot;url&quot;: &quot;https://northgate-studio.test/assets/logo.png&quot;
+      }
+    },
+    {
+      &quot;@type&quot;: &quot;WebPage&quot;,
+      &quot;@id&quot;: &quot;https://northgate-studio.test/#webpage&quot;,
+      &quot;url&quot;: &quot;https://northgate-studio.test/&quot;,
+      &quot;name&quot;: &quot;Home&quot;,
+      &quot;isPartOf&quot;: {
+        &quot;@id&quot;: &quot;https://northgate-studio.test/#organization&quot;
+      }
+    }
+  ]
+}
+&lt;/script&gt;</pre>
+</section>
 
 <footer>
   Generated by <code>python -m audit</code> from the
   <b>AI Website QA Platform</b> &mdash; a dependency-free static HTML audit engine
   (Python standard library only, no third-party packages).<br>
   Scope of this run: SEO metadata, heading structure, image accessibility and optimisation
-  hints, and&mdash;when enabled&mdash;link reachability. Lighthouse performance metrics,
-  axe-core accessibility rules, rendered-DOM inspection, and visual/design review require
-  the browser-based modules and are <b>not</b> part of this report.
+  hints, and&mdash;when enabled&mdash;link reachability, plus a content listing, structure
+  outline, image alt inventory, and generated schema.org markup. Analysis is of the
+  <b>served HTML</b>: Lighthouse performance metrics, axe-core accessibility rules,
+  JavaScript-rendered content, and visual/design review require the browser-based modules
+  and are <b>not</b> part of this report.
 </footer>
 
 </div>

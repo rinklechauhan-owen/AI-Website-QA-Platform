@@ -9,7 +9,7 @@ import webbrowser
 from pathlib import Path
 from typing import List, Optional
 
-from audit import __version__
+from audit import __version__, inventory, server
 from audit.engine import audit_url
 from audit.fetch import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, FetchError
 from audit.findings import Severity
@@ -38,13 +38,35 @@ def build_parser() -> argparse.ArgumentParser:
         description="Audit a web page for SEO, image accessibility, and link problems. "
         "Uses only the Python standard library — no third-party packages required.",
         epilog="Examples:\n"
+        "  python -m audit --serve                              # paste URLs in a browser\n"
         "  python -m audit example.com\n"
         "  python -m audit https://example.com --format html --out report.html --open\n"
         "  python -m audit https://example.com --check-links --format json\n"
         "  python -m audit https://example.com --fail-on high   # for CI\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("url", help="page to audit; the https:// scheme is added if omitted")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        help="page to audit; the https:// scheme is added if omitted. Omit when using --serve",
+    )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="start a local web UI and open it, so URLs can be pasted into a browser",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=server.DEFAULT_PORT,
+        metavar="N",
+        help=f"port for --serve (default: {server.DEFAULT_PORT}; next free port if taken)",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="with --serve, do not open a browser tab automatically",
+    )
     parser.add_argument(
         "-f",
         "--format",
@@ -74,6 +96,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="cap on links checked by --check-links (default: 40)",
     )
     parser.add_argument(
+        "--content-tags",
+        default=",".join(inventory.DEFAULT_CONTENT_TAGS),
+        metavar="TAGS",
+        help="comma-separated tags to list in the content section "
+        f"(default: {','.join(inventory.DEFAULT_CONTENT_TAGS)})",
+    )
+    parser.add_argument(
+        "--outline-depth",
+        type=int,
+        default=inventory.DEFAULT_MAX_OUTLINE_DEPTH,
+        metavar="N",
+        help=f"nesting depth shown in the structure outline "
+        f"(default: {inventory.DEFAULT_MAX_OUTLINE_DEPTH})",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=DEFAULT_TIMEOUT,
@@ -101,12 +138,26 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.serve:
+        return server.serve(
+            port=args.port,
+            open_browser=not args.no_browser,
+        )
+
+    if not args.url:
+        parser.error("a url is required unless --serve is given")
 
     output_format = "html" if args.open_after and args.format == "text" else args.format
 
     if args.open_after and not args.out:
         args.out = "qa-report.html"
+
+    content_tags = [tag.strip().lower() for tag in args.content_tags.split(",") if tag.strip()]
+    if not content_tags:
+        parser.error("--content-tags needs at least one tag, e.g. h2,h3,p")
 
     try:
         result = audit_url(
@@ -116,6 +167,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             timeout=args.timeout,
             user_agent=args.user_agent,
             verify_tls=not args.insecure,
+            content_tags=content_tags,
+            outline_depth=args.outline_depth,
         )
     except FetchError as exc:
         print(f"error: could not fetch page — {exc}", file=sys.stderr)

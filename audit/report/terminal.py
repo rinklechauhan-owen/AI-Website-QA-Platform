@@ -187,9 +187,83 @@ def render(result: AuditResult, color: bool = None, ascii_only: bool = None) -> 
                 out.extend(_wrap(conv("Fix: " + finding.recommendation), indent=6))
             out.append("")
 
+    if result.inventory is not None:
+        out.extend(_inventory_lines(result.inventory, conv, paint, color, sep))
+
     out.append("=" * WIDTH)
     out.append("  Static HTML analysis only. Performance, rendered-DOM, and visual checks")
     out.append("  require the browser-based modules and are not included in this run.")
     out.append("=" * WIDTH)
 
     return "\n".join(out)
+
+
+def _heading(title: str) -> List[str]:
+    return ["-" * WIDTH, f"  {title.upper()}", "-" * WIDTH]
+
+
+def _inventory_lines(inventory, conv, paint, color: bool, sep: str) -> List[str]:
+    out: List[str] = []
+
+    # --- content listing ---
+    content = inventory.content
+    counts = " ".join(f"{tag}:{n}" for tag, n in content.counts.items() if n)
+    out.extend(_heading("page content"))
+    out.append(f"  {len(content.blocks)} blocks {sep} {content.total_words} words {sep} {counts}")
+    out.append("")
+    if not content.blocks:
+        out.append("  No content blocks found.")
+        out.append("")
+    else:
+        for block in content.blocks:
+            label = f"  {block.tag.upper():<3} L{block.line:<5} "
+            wrapped = _wrap(conv(block.text), indent=len(label))
+            if wrapped:
+                # Fold the label into the first wrapped line.
+                out.append(label + wrapped[0].lstrip())
+                out.extend(wrapped[1:])
+        out.append("")
+
+    # --- structure outline ---
+    outline = inventory.outline
+    out.extend(_heading("page structure"))
+    out.append(f"  {outline.total_nodes} elements {sep} max depth {outline.max_depth_seen}")
+    if outline.was_truncated:
+        dropped = outline.truncated_depth + outline.truncated_count
+        out.append(f"  ({dropped} deeper or later element(s) not shown)")
+    out.append("")
+    for row in outline.rows:
+        out.append("  " + "  " * row.depth + conv(row.selector))
+    out.append("")
+
+    # --- image alt inventory ---
+    images = inventory.images
+    out.extend(_heading("image alt text"))
+    out.append(f"  {images.total} images {sep} {images.coverage:.0f}% described")
+    out.append("")
+    if not images.needs_attention:
+        out.append("  All images have alt text.")
+    else:
+        for image in images.needs_attention:
+            state = image.alt_state.upper()
+            tag = paint(f"[{state}]", _ANSI[Severity.HIGH if state == "MISSING" else Severity.MEDIUM])
+            out.append(f"  {tag} L{image.line}")
+            out.extend(_wrap(conv(image.src or "(no src)"), indent=6))
+    out.append("")
+
+    # --- suggested schema ---
+    schema = inventory.schema
+    out.extend(_heading("suggested schema.org markup"))
+    existing = ", ".join(schema.existing_types) if schema.existing_types else "none"
+    out.append(f"  Already on page: {existing}")
+    out.append(f"  Suggested:       {', '.join(schema.suggested_types) or 'none'}")
+    out.append("")
+    for note in schema.notes:
+        out.extend(_wrap(conv("note: " + note), indent=2))
+    if schema.notes:
+        out.append("")
+    for line in schema.script_block.splitlines():
+        out.append("  " + conv(line))
+    out.append("")
+
+    return out

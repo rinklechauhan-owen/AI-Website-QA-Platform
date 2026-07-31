@@ -12,7 +12,15 @@ Full product spec: [docs/PRD.md](docs/PRD.md)
 ## Try it in one command
 
 The audit engine in [`audit/`](audit/) is **written against the Python standard library only** —
-no `pip install`, no database, no Docker, no API keys. If you have Python 3.9+, it runs:
+no `pip install`, no database, no Docker, no API keys. If you have Python 3.9+, it runs.
+
+**Paste URLs into a browser** — starts a local web UI and opens it:
+
+```bash
+python -m audit --serve
+```
+
+Or straight from the command line:
 
 ```bash
 python -m audit example.com
@@ -40,12 +48,18 @@ across 21 findings. Regenerate it with `python examples/generate_sample.py`.
 
 ```
 python -m audit <url> [options]
+python -m audit --serve [--port N] [--no-browser]
 
+      --serve                    start the local web UI and open a browser
+      --port N                   port for --serve (default: 8765; next free port if taken)
+      --no-browser               with --serve, do not open a tab automatically
   -f, --format {text,html,json}  output format (default: text)
   -o, --out FILE                 write the report to FILE instead of stdout
       --open                     open the written report in a browser (implies --format html)
       --check-links              verify every link resolves (extra HTTP requests)
       --max-links N              cap on links checked (default: 40)
+      --content-tags TAGS        tags listed in the content section (default: h1,h2,h3,p)
+      --outline-depth N          nesting depth shown in the structure outline (default: 8)
       --timeout SECONDS          per-request timeout (default: 20)
       --user-agent UA            User-Agent header to send
       --insecure                 skip TLS verification (self-signed staging certs)
@@ -57,6 +71,17 @@ Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` the page could 
 
 </details>
 
+### The web UI
+
+`--serve` runs a local server built on `http.server` — still no third-party packages. Paste a
+URL, tick whether to check links, and the same HTML report renders in the browser.
+
+It binds to `127.0.0.1` only, deliberately: the engine fetches whatever URL it is handed, so
+exposing it on a network would be handing out an open request proxy. Non-HTTP schemes
+(`file:`, `javascript:`, `data:`, `ftp:`) are rejected before reaching the fetcher, and every
+response carries a `Content-Security-Policy` of `default-src 'none'` because reports embed
+text taken from the audited page.
+
 ---
 
 ## Project status
@@ -65,7 +90,7 @@ Two layers, at different maturities. Being explicit about which is which:
 
 | Layer | State |
 | --- | --- |
-| [`audit/`](audit/) — static analysis engine + CLI | **Working.** SEO, image, and link rule packs; text/HTML/JSON reports; 73 tests |
+| [`audit/`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, and link rule packs; page inventory; text/HTML/JSON reports; 138 tests |
 | [`services/api/`](services/api/) — FastAPI + Celery service | **Scaffold.** Models, schemas, task orchestration, and migrations wired; audit modules are registered stubs |
 | [`apps/web/`](apps/web/) — Next.js dashboard | **Scaffold.** Layout, typed API client, and scan form; no report views yet |
 
@@ -97,6 +122,25 @@ mixed-content images on HTTPS pages, plain-HTTP links.
 Each finding carries a stable rule ID, a severity, and a specific fix — not just a label.
 Scores start at 100 per pack and deduct by severity; `info` findings never reduce a score.
 
+### Page inventory
+
+Alongside findings, every report includes four extracts (`audit/inventory.py`) — reference
+material rather than pass/fail judgements:
+
+- **Page content** — every heading and paragraph in document order with line numbers and word
+  counts. Choose the tags with `--content-tags h2,h3,p`.
+- **Page structure** — a nested outline of the document's structural elements with their ids
+  and classes. Inline formatting is excluded so the shape of the page stays legible; depth and
+  node count are capped, and anything omitted is reported rather than silently dropped.
+- **Image alt text** — the source URL of every image with no `alt` attribute or an explicitly
+  empty one, plus a coverage percentage.
+- **Suggested schema.org markup** — JSON-LD generated from what is demonstrably on the page
+  (Organization, WebPage, BreadcrumbList, and Article or FAQPage when the content supports it),
+  ready to paste into `<head>`. Structured data the page already declares is detected and
+  flagged so suggestions are merged rather than duplicated. **No placeholder values are ever
+  emitted** — a field that cannot be derived is left out and noted, because markup that
+  describes a page inaccurately is worse than none.
+
 ### Deliberately not claimed
 
 Lighthouse performance metrics, axe-core accessibility rules, rendered-DOM inspection,
@@ -109,17 +153,21 @@ can't be mistaken for a full audit.
 
 ## Tests
 
-73 tests, standard library `unittest`, no network access required:
+138 tests, standard library `unittest`, no network access required:
 
 ```bash
 python -m unittest discover -s tests -t . -v
 ```
 
 Coverage focuses on the things most likely to break silently: parser edge cases (entities,
-headings that wrap links, malformed markup), the boundary between a missing `alt` attribute and
-an empty one, score arithmetic, CLI exit codes, and HTML escaping — the report embeds
-page-controlled text, so [`tests/test_report.py`](tests/test_report.py) audits a hostile fixture
-and asserts no live `<script>` or event handler survives into the output.
+headings that wrap links, unclosed `<p>` tags, malformed markup), the boundary between a
+missing `alt` attribute and an empty one, score arithmetic, CLI exit codes, URL scheme
+validation, and HTML escaping — reports embed page-controlled text, so
+[`tests/test_report.py`](tests/test_report.py) audits a hostile fixture and asserts no live
+`<script>` or event handler survives into the output.
+
+[`tests/test_server.py`](tests/test_server.py) starts a real server on a free loopback port and
+drives it over HTTP, with the audit itself stubbed so the suite stays offline.
 
 ---
 
@@ -154,11 +202,13 @@ CLI reaches it without any of the infrastructure above.
 ## Repository layout
 
 ```
-audit/                  Dependency-free audit engine and CLI
+audit/                  Dependency-free audit engine, CLI, and web UI
   fetch.py              urllib-based fetching: redirects, gzip, charset detection
-  parse.py              html.parser document model
+  parse.py              html.parser document model and structure tree
   findings.py           Finding dataclass, severity weighting, scoring
+  inventory.py          Content listing, structure outline, alt inventory, schema.org
   engine.py             Orchestration and result aggregation
+  server.py             http.server web UI for --serve
   rules/                seo.py · images.py · links.py
   report/               html.py (self-contained) · terminal.py
 apps/
