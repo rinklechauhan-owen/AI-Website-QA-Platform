@@ -205,10 +205,10 @@ def _heading(title: str) -> List[str]:
 def _inventory_lines(inventory, conv, paint, color: bool, sep: str) -> List[str]:
     out: List[str] = []
 
-    # --- content listing ---
+    # --- headings / content listing ---
     content = inventory.content
     counts = " ".join(f"{tag}:{n}" for tag, n in content.counts.items() if n)
-    out.extend(_heading("page content"))
+    out.extend(_heading("headings"))
     out.append(f"  {len(content.blocks)} blocks {sep} {content.total_words} words {sep} {counts}")
     out.append("")
     if not content.blocks:
@@ -249,6 +249,40 @@ def _inventory_lines(inventory, conv, paint, color: bool, sep: str) -> List[str]
             tag = paint(f"[{state}]", _ANSI[Severity.HIGH if state == "MISSING" else Severity.MEDIUM])
             out.append(f"  {tag} L{image.line}")
             out.extend(_wrap(conv(image.src or "(no src)"), indent=6))
+    out.append("")
+
+    # --- meta tags ---
+    out.extend(_heading("meta tags"))
+    if not inventory.metas:
+        out.append("  No meta tags found.")
+    else:
+        for tag in inventory.metas:
+            label = f"  {tag.key:<28} "
+            value = tag.content or "(empty)"
+            wrapped = _wrap(conv(value), indent=len(label))
+            out.append(label + (wrapped[0].lstrip() if wrapped else ""))
+            out.extend(wrapped[1:])
+    out.append("")
+
+    # --- canonical ---
+    canonical = inventory.canonical
+    out.extend(_heading("canonical url"))
+    if not canonical.present:
+        out.append("  No canonical declared.")
+    else:
+        out.append(f"  Declared      {conv(canonical.declared or '')}")
+        out.append(f"  Page URL      {conv(canonical.page_url)}")
+        out.append(f"  Self-ref      {'yes' if canonical.is_self_referencing else 'NO'}")
+        out.append(f"  Absolute      {'yes' if canonical.is_absolute else 'NO'}")
+    out.append("")
+
+    # --- index / follow ---
+    info = inventory.index_follow
+    out.extend(_heading("index / follow"))
+    out.append(f"  robots meta      {info.robots_meta or '(not set)'}")
+    out.append(f"  googlebot meta   {info.googlebot_meta or '(not set)'}")
+    out.append(f"  X-Robots-Tag     {info.x_robots_tag or '(not set)'}")
+    out.append(f"  Effective        {info.summary}")
     out.append("")
 
     # --- suggested schema ---

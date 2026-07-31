@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
         "  python -m audit --serve                              # paste URLs in a browser\n"
         "  python -m audit example.com\n"
         "  python -m audit https://example.com --format html --out report.html --open\n"
-        "  python -m audit https://example.com --check-links --format json\n"
+        "  python -m audit https://example.com --check-links --check-images\n"
         "  python -m audit https://example.com --fail-on high   # for CI\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -94,6 +94,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=40,
         metavar="N",
         help="cap on links checked by --check-links (default: 40)",
+    )
+    parser.add_argument(
+        "--check-images",
+        action="store_true",
+        help="measure every image's transfer size (one extra request per image)",
+    )
+    parser.add_argument(
+        "--image-size-limit",
+        type=float,
+        default=2.5,
+        metavar="MB",
+        help="flag images heavier than this many megabytes (default: 2.5)",
     )
     parser.add_argument(
         "--content-tags",
@@ -169,6 +181,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             verify_tls=not args.insecure,
             content_tags=content_tags,
             outline_depth=args.outline_depth,
+            check_images=args.check_images,
+            image_size_limit=int(args.image_size_limit * 1024 * 1024),
         )
     except FetchError as exc:
         print(f"error: could not fetch page — {exc}", file=sys.stderr)

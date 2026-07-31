@@ -82,7 +82,7 @@ def _decode(raw: bytes, content_type: str) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def _build_opener(verify_tls: bool) -> urllib.request.OpenerDirector:
+def build_opener(verify_tls: bool) -> urllib.request.OpenerDirector:
     context = ssl.create_default_context()
     if not verify_tls:
         context.check_hostname = False
@@ -111,7 +111,7 @@ def fetch(
         },
     )
 
-    opener = _build_opener(verify_tls)
+    opener = build_opener(verify_tls)
     started = time.monotonic()
 
     try:

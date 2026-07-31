@@ -126,19 +126,32 @@ class TestServerRoutes(unittest.TestCase):
         self.assertEqual(status, 500)
         self.assertEqual(self._get("/")[0], 200, "server should still be serving")
 
-    def test_successful_audit_renders_every_section(self):
+    def test_successful_audit_renders_every_tab(self):
         with mock.patch.object(server, "audit_url", _stub_audit):
             status, body = self._post({"url": "example.com"})
         self.assertEqual(status, 200)
-        for section in (
-            "Page content",
-            "Page structure",
-            "Image alt text",
-            "Suggested schema.org markup",
-            "Audit another page",
+        for tab_id in (
+            "panel-seo",
+            "panel-headings",
+            "panel-meta",
+            "panel-canonical",
+            "panel-alt",
+            "panel-imgsize",
+            "panel-robots",
+            "panel-schema",
+            "panel-structure",
         ):
-            with self.subTest(section=section):
-                self.assertIn(section, body)
+            with self.subTest(tab=tab_id):
+                self.assertIn(f'id="{tab_id}"', body)
+        self.assertIn("Audit another page", body)
+
+    def test_tabs_work_without_javascript(self):
+        """Radio + :checked, so a saved report still switches tabs offline."""
+        with mock.patch.object(server, "audit_url", _stub_audit):
+            _, body = self._post({"url": "example.com"})
+        self.assertIn('type="radio" name="qa-tabs"', body)
+        self.assertIn("#tab-seo:checked ~ .panels > #panel-seo", body)
+        self.assertNotIn("<script", body.lower())
 
     def test_served_report_contains_no_live_script(self):
         with mock.patch.object(server, "audit_url", _stub_audit):
@@ -154,7 +167,7 @@ class TestServerRoutes(unittest.TestCase):
         with mock.patch.object(server, "audit_url", _stub_audit):
             status, body = self._get("/?url=example.com")
         self.assertEqual(status, 200)
-        self.assertIn("Page content", body)
+        self.assertIn('id="panel-headings"', body)
 
     def test_csp_header_blocks_scripts(self):
         with urllib.request.urlopen(self.base + "/", timeout=10) as resp:

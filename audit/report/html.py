@@ -7,8 +7,9 @@ emailed, committed, or opened straight off disk and still render identically.
 from __future__ import annotations
 
 from html import escape
-from typing import List
+from typing import Dict, List, Tuple
 
+from audit.assets import human_size
 from audit.engine import AuditResult, PackResult
 from audit.findings import Finding, Severity
 
@@ -177,6 +178,30 @@ h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
          padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
 .clean b { color: var(--good); }
 
+/* --- tabs (radio + :checked, so the report needs no JavaScript) --- */
+.tabs { margin-top: 34px; }
+/* Visually hidden but still focusable and exposed to assistive technology. Zero width and
+   height, or display:none, would drop the radios out of the accessibility tree and leave the
+   tabs keyboard-unreachable. */
+.tabs > input[type=radio] { position: absolute; width: 1px; height: 1px; margin: -1px;
+                            padding: 0; overflow: hidden; white-space: nowrap;
+                            clip: rect(0 0 0 0); clip-path: inset(50%); border: 0; }
+.tablist { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--border);
+           margin-bottom: 26px; scrollbar-width: thin; }
+.tablist label { flex: 0 0 auto; padding: 10px 15px; cursor: pointer; font-size: 13.5px;
+                 font-weight: 550; color: var(--ink-muted); white-space: nowrap;
+                 border-bottom: 2px solid transparent; margin-bottom: -1px;
+                 border-radius: 7px 7px 0 0; user-select: none; }
+.tablist label:hover { color: var(--ink); background: var(--card); }
+.tablist .badge-n { display: inline-block; margin-left: 7px; padding: 1px 7px;
+                    border-radius: 999px; font-size: 11px; font-weight: 650;
+                    background: var(--bg); border: 1px solid var(--border);
+                    color: var(--ink-muted); }
+.tablist label.warn .badge-n { background: var(--high); border-color: var(--high); color: #fff; }
+@media (prefers-color-scheme: dark) { .tablist label.warn .badge-n { color: #0c111d; } }
+.panel { display: none; }
+.panel > section:first-child { margin-top: 0; }
+
 /* --- inventory: content listing --- */
 .blocks { display: flex; flex-direction: column; gap: 1px; background: var(--border);
           border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
@@ -338,35 +363,295 @@ def _section(pack: PackResult) -> str:
     return "\n".join(parts)
 
 
-def _content_section(inventory) -> str:
-    content = inventory.content
-    counts = content.counts
-    summary = " · ".join(f"{count} &lt;{tag}&gt;" for tag, count in counts.items() if count)
+def _headings_section(document) -> str:
+    """H1-H6 only, indented by level so the outline reads as a hierarchy."""
+    headings = list(document.headings) if document else []
+    counts: Dict[str, int] = {}
+    for heading in headings:
+        key = f"h{heading.level}"
+        counts[key] = counts.get(key, 0) + 1
+    summary = " · ".join(f"{counts[f'h{n}']} &lt;h{n}&gt;" for n in range(1, 7) if counts.get(f"h{n}"))
 
     parts = ["<section>"]
     parts.append(
-        f'  <h2>Page content <span class="count-pill">{len(content.blocks)} blocks</span>'
-        f'<span class="count-pill">{content.total_words} words</span></h2>'
+        f'  <h2>Headings <span class="count-pill">{len(headings)} total</span></h2>'
     )
     parts.append(
-        f'  <p class="section-note">Every heading and paragraph in document order. '
-        f"{summary or 'No matching content found.'}</p>"
+        f'  <p class="section-note">Every H1&ndash;H6 in document order, indented by level. '
+        f"{summary or 'No headings found.'}</p>"
     )
 
-    if not content.blocks:
-        parts.append('  <div class="clean">No content blocks matched the selected tags.</div>')
+    if not headings:
+        parts.append(
+            '  <div class="clean">No headings on this page. Every page needs at least an H1.</div>'
+        )
         parts.append("</section>")
         return "\n".join(parts)
 
     parts.append('  <div class="blocks">')
-    for block in content.blocks:
+    for heading in headings:
+        text = escape(heading.text) if heading.text.strip() else "<em>(empty heading)</em>"
+        indent = (heading.level - 1) * 18
         parts.append(
-            f'    <div class="block {block.tag}"><span class="tag">{block.tag}</span>'
-            f'<span class="txt">{escape(block.text)}</span>'
-            f'<span class="ln">L{block.line}</span></div>'
+            f'    <div class="block h{heading.level}">'
+            f'<span class="tag">h{heading.level}</span>'
+            f'<span class="txt" style="padding-left:{indent}px">{text}</span>'
+            f'<span class="ln">L{heading.line}</span></div>'
         )
     parts.append("  </div>")
     parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _meta_section(inventory) -> str:
+    metas = inventory.metas
+    parts = ["<section>"]
+    parts.append(f'  <h2>Meta tags <span class="count-pill">{len(metas)} tags</span></h2>')
+    parts.append(
+        '  <p class="section-note">Every <code>&lt;meta&gt;</code> element as served, in '
+        "document order.</p>"
+    )
+
+    if not metas:
+        parts.append('  <div class="clean">No meta tags found.</div>')
+        parts.append("</section>")
+        return "\n".join(parts)
+
+    parts.append('  <div class="scroll-x"><table class="grid">')
+    parts.append("    <tr><th>Attribute</th><th>Key</th><th>Content</th></tr>")
+    for tag in metas:
+        content = (
+            escape(tag.content)
+            if not tag.is_empty
+            else '<span class="state empty">empty</span>'
+        )
+        parts.append(
+            f"    <tr><td>{escape(tag.kind)}</td>"
+            f'<td class="mono">{escape(tag.key)}</td><td>{content}</td></tr>'
+        )
+    parts.append("    </table></div>")
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _canonical_section(inventory, findings) -> str:
+    canonical = inventory.canonical
+    parts = ["<section>"]
+    state = "declared" if canonical.present else "missing"
+    parts.append(f'  <h2>Canonical URL <span class="count-pill">{state}</span></h2>')
+    parts.append(
+        '  <p class="section-note">The canonical tells search engines which URL to index when '
+        "the same content is reachable by more than one address.</p>"
+    )
+
+    if not canonical.present:
+        parts.append(
+            '  <div class="f-el">No &lt;link rel="canonical"&gt; on this page.</div>'
+        )
+    else:
+        parts.append('  <div class="scroll-x"><table class="grid">')
+        parts.append("    <tr><th>Property</th><th>Value</th></tr>")
+        rows = [
+            ("Declared canonical", escape(canonical.declared or "")),
+            ("Page URL", escape(canonical.page_url)),
+            ("Self-referencing", "yes" if canonical.is_self_referencing else "<b>no</b>"),
+            ("Absolute URL", "yes" if canonical.is_absolute else "<b>no — should be absolute</b>"),
+        ]
+        for label, value in rows:
+            parts.append(f'    <tr><td>{label}</td><td class="mono">{value}</td></tr>')
+        parts.append("    </table></div>")
+
+        if not canonical.is_self_referencing:
+            parts.append(
+                '  <p class="f-fix"><b>Note:</b> the canonical points at a different URL, so '
+                "this page is asking not to be indexed in its own right. Intentional for "
+                "duplicates and paginated views; a mistake everywhere else.</p>"
+            )
+        elif canonical.differs_only_by_trailing_slash:
+            parts.append(
+                '  <p class="f-fix"><b>Note:</b> the canonical matches this page apart from a '
+                "trailing slash. Harmless, but make it byte-identical to avoid ambiguity.</p>"
+            )
+
+    related = [f for f in findings if "canonical" in f.rule]
+    if related:
+        parts.append('  <div style="margin-top:18px">')
+        parts.extend(_finding_block(f) for f in related)
+        parts.append("  </div>")
+
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _index_follow_section(inventory) -> str:
+    info = inventory.index_follow
+    parts = ["<section>"]
+    pill = escape(info.summary)
+    parts.append(f'  <h2>Index / Follow <span class="count-pill">{pill}</span></h2>')
+    parts.append(
+        '  <p class="section-note">Crawler directives from both the markup and the HTTP '
+        "response. A header-level <code>X-Robots-Tag</code> is invisible in the HTML and is a "
+        'classic cause of "the page looks fine but will not rank".</p>'
+    )
+
+    parts.append('  <div class="scroll-x"><table class="grid">')
+    parts.append("    <tr><th>Source</th><th>Value</th></tr>")
+    for label, value in (
+        ('&lt;meta name="robots"&gt;', info.robots_meta),
+        ('&lt;meta name="googlebot"&gt;', info.googlebot_meta),
+        ("X-Robots-Tag header", info.x_robots_tag),
+    ):
+        shown = (
+            f'<span class="mono">{escape(value)}</span>'
+            if value
+            else '<span style="opacity:.6">not set</span>'
+        )
+        parts.append(f"    <tr><td>{label}</td><td>{shown}</td></tr>")
+    parts.append(
+        f'    <tr><td><b>Effective</b></td><td><b>{escape(info.summary)}</b></td></tr>'
+    )
+    parts.append("    </table></div>")
+
+    if info.is_default:
+        parts.append(
+            '  <p class="f-fix"><b>Default:</b> nothing on the page restricts crawling, so it '
+            "is treated as index, follow. No robots meta tag is needed to achieve that.</p>"
+        )
+    elif not info.indexable:
+        parts.append(
+            '  <p class="f-fix"><b>This page cannot rank.</b> A noindex directive is active. '
+            "That is correct for thank-you pages and internal search results, and a serious "
+            "problem anywhere else — it is frequently a staging directive left in after "
+            "go-live.</p>"
+        )
+    elif not info.followable:
+        parts.append(
+            '  <p class="f-fix"><b>Links are not followed</b> from this page, so it passes no '
+            "authority onward. Rarely intentional outside paid or user-generated pages.</p>"
+        )
+
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _image_size_section(report) -> str:
+    parts = ["<section>"]
+
+    if report is None or not report.checked:
+        limit = report.limit_label if report is not None else "2.50 MB"
+        parts.append(f'  <h2>Image size <span class="count-pill">not checked</span></h2>')
+        parts.append(
+            '  <p class="section-note">Measuring image weight needs one request per image, so '
+            "it is off by default.</p>"
+        )
+        parts.append(
+            '  <div class="f-el">Enable it with <b>--check-images</b> on the command line, or '
+            'tick <b>"Check image sizes"</b> in the web UI. '
+            f"Images over {escape(limit)} will be listed here.</div>"
+        )
+        parts.append("</section>")
+        return "\n".join(parts)
+
+    oversized = report.oversized
+    parts.append(
+        f'  <h2>Image size <span class="count-pill">over {escape(report.limit_label)}: '
+        f'{len(oversized)}</span>'
+        f'<span class="count-pill">{human_size(report.total_bytes)} total</span></h2>'
+    )
+    parts.append(
+        f'  <p class="section-note">{len(report.measured)} image(s) measured'
+        + (f", {len(report.unknown)} unavailable" if report.unknown else "")
+        + (f", {report.not_checked} beyond the cap" if report.not_checked else "")
+        + ". Sizes come from Content-Length, or a capped read where the server omits it.</p>"
+    )
+
+    if not oversized:
+        parts.append(
+            f'  <div class="clean"><b>&#10003; Clean.</b> No image exceeds '
+            f"{escape(report.limit_label)}.</div>"
+        )
+    else:
+        parts.append('  <div class="scroll-x"><table class="grid">')
+        parts.append("    <tr><th>Size</th><th>Image source</th><th>Type</th><th>Line</th></tr>")
+        for measurement in oversized:
+            parts.append(
+                f'    <tr><td><span class="state missing">{escape(measurement.display_size)}'
+                f'</span></td><td class="mono">{escape(measurement.src)}</td>'
+                f"<td>{escape(measurement.content_type or '—')}</td>"
+                f"<td>{measurement.line}</td></tr>"
+            )
+        parts.append("    </table></div>")
+
+    # Always show the full measured list; the heavy ones are only meaningful in context.
+    others = [m for m in report.measurements if not m.exceeds(report.limit_bytes)]
+    if others:
+        ranked = sorted(others, key=lambda m: m.byte_size or -1, reverse=True)
+        parts.append(
+            f'  <p class="section-note" style="margin-top:22px">Remaining images, heaviest '
+            f"first.</p>"
+        )
+        parts.append('  <div class="scroll-x"><table class="grid">')
+        parts.append("    <tr><th>Size</th><th>Image source</th><th>Line</th></tr>")
+        for measurement in ranked:
+            label = escape(measurement.display_size)
+            if measurement.error:
+                label = f'<span style="opacity:.7">{escape(measurement.error)}</span>'
+            parts.append(
+                f'    <tr><td class="mono">{label}</td>'
+                f'<td class="mono">{escape(measurement.src)}</td>'
+                f"<td>{measurement.line}</td></tr>"
+            )
+        parts.append("    </table></div>")
+
+    parts.append("</section>")
+    return "\n".join(parts)
+
+
+def _tab_css(keys: List[str]) -> str:
+    """Per-tab :checked rules. Generated because the tab set varies by run."""
+    rules = []
+    for key in keys:
+        rules.append(
+            f"#tab-{key}:checked ~ .panels > #panel-{key} {{ display: block; }}\n"
+            f'#tab-{key}:checked ~ .tablist label[for="tab-{key}"] '
+            "{ color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }\n"
+            # Keyboard users need to see which tab has focus, not just which is selected.
+            f'#tab-{key}:focus-visible ~ .tablist label[for="tab-{key}"] '
+            "{ outline: 2px solid var(--accent); outline-offset: -2px; }"
+        )
+    # Printing has no interaction, so every panel is shown.
+    rules.append("@media print { .panel { display: block !important; } .tablist { display: none; } }")
+    return "\n".join(rules)
+
+
+def _render_tabs(tabs: List[Tuple[str, str, str, bool, str]]) -> str:
+    """tabs: (key, label, badge, warn, body). The first tab is selected."""
+    # A native radio group rather than the ARIA tabs pattern: aria-selected would have to be
+    # kept in step by script, and this report deliberately ships none. Arrow keys move between
+    # radios for free, and each label supplies its radio's accessible name.
+    parts = ['<div class="tabs" role="radiogroup" aria-label="Report sections">']
+
+    for index, (key, _, _, _, _) in enumerate(tabs):
+        checked = " checked" if index == 0 else ""
+        parts.append(
+            f'  <input type="radio" name="qa-tabs" id="tab-{key}"{checked}>'
+        )
+
+    parts.append('  <div class="tablist">')
+    for key, label, badge, warn, _ in tabs:
+        chip = f'<span class="badge-n">{escape(badge)}</span>' if badge else ""
+        classes = ' class="warn"' if warn else ""
+        parts.append(f'    <label for="tab-{key}"{classes}>{escape(label)}{chip}</label>')
+    parts.append("  </div>")
+
+    parts.append('  <div class="panels">')
+    for key, _, _, _, body in tabs:
+        parts.append(f'    <div class="panel" id="panel-{key}">')
+        parts.append(body)
+        parts.append("    </div>")
+    parts.append("  </div>")
+
+    parts.append("</div>")
     return "\n".join(parts)
 
 
@@ -508,18 +793,121 @@ def render(result: AuditResult) -> str:
     if result.was_redirected:
         facts.append(f"<li>Redirected from <b>{escape(result.url)}</b></li>")
 
-    sections = "\n".join(_section(pack) for pack in result.packs)
     pack_cards = "\n".join(_pack_card(pack) for pack in result.packs)
+    packs_by_module = {pack.module: pack for pack in result.packs}
+    inventory = result.inventory
 
-    if result.inventory is not None:
-        sections += "\n" + "\n".join(
+    def pack_body(module: str) -> str:
+        pack = packs_by_module.get(module)
+        return _section(pack) if pack else ""
+
+    def pack_count(module: str) -> Tuple[str, bool]:
+        pack = packs_by_module.get(module)
+        if not pack or not pack.findings:
+            return "", False
+        return str(len(pack.findings)), True
+
+    tabs: List[Tuple[str, str, str, bool, str]] = []
+
+    # 1. SEO findings
+    seo_badge, seo_warn = pack_count("seo")
+    tabs.append(("seo", "SEO", seo_badge, seo_warn, pack_body("seo")))
+
+    if inventory is not None:
+        # 2. Headings, H1-H6 only
+        heading_count = len(result.document.headings) if result.document else 0
+        tabs.append(
+            ("headings", "Headings", str(heading_count), False, _headings_section(result.document))
+        )
+
+        # 3. Meta tags
+        tabs.append(
+            ("meta", "Meta Tags", str(len(inventory.metas)), False, _meta_section(inventory))
+        )
+
+        # 4. Canonical
+        canonical_ok = inventory.canonical.present and inventory.canonical.is_self_referencing
+        tabs.append(
             (
-                _content_section(result.inventory),
-                _outline_section(result.inventory),
-                _image_alt_section(result.inventory),
-                _schema_section(result.inventory),
+                "canonical",
+                "Canonical",
+                "ok" if canonical_ok else "check",
+                not canonical_ok,
+                _canonical_section(inventory, result.findings),
             )
         )
+
+        # 5. Missing alt text
+        flagged = len(inventory.images.needs_attention)
+        tabs.append(
+            (
+                "alt",
+                "Alt Missing",
+                str(flagged) if flagged else "0",
+                bool(inventory.images.missing),
+                _image_alt_section(inventory),
+            )
+        )
+
+    # 6. Image weight
+    report = result.image_sizes
+    if report is not None and report.checked:
+        over = len(report.oversized)
+        size_badge, size_warn = (str(over), True) if over else ("0", False)
+    else:
+        size_badge, size_warn = "off", False
+    tabs.append(("imgsize", "Image Size", size_badge, size_warn, _image_size_section(report)))
+
+    if inventory is not None:
+        # 7. Index / follow
+        info = inventory.index_follow
+        restricted = not (info.indexable and info.followable)
+        tabs.append(
+            (
+                "robots",
+                "Index / Follow",
+                "blocked" if restricted else "ok",
+                restricted,
+                _index_follow_section(inventory),
+            )
+        )
+
+        # 8. Schema
+        tabs.append(
+            (
+                "schema",
+                "Schema",
+                str(len(inventory.schema.suggested_types)),
+                False,
+                _schema_section(inventory),
+            )
+        )
+
+    # Remaining findings and extracts, so nothing from the audit becomes unreachable.
+    image_badge, image_warn = pack_count("images")
+    if "images" in packs_by_module:
+        tabs.append(("images", "Image Issues", image_badge, image_warn, pack_body("images")))
+
+    if inventory is not None:
+        tabs.append(
+            (
+                "structure",
+                "Structure",
+                str(inventory.outline.total_nodes),
+                False,
+                _outline_section(inventory),
+            )
+        )
+
+    if "links" in packs_by_module:
+        link_badge, link_warn = pack_count("links")
+        tabs.append(("links", "Links", link_badge, link_warn, pack_body("links")))
+
+    if "http" in packs_by_module:
+        tabs.insert(0, ("http", "HTTP", "!", True, pack_body("http")))
+
+    tab_markup = _render_tabs(tabs)
+    tab_rules = _tab_css([key for key, *_ in tabs])
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -527,7 +915,8 @@ def render(result: AuditResult) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QA Audit — {escape(result.page_title)}</title>
-<style>{_CSS}</style>
+<style>{_CSS}
+{tab_rules}</style>
 </head>
 <body>
 <div class="wrap">
@@ -552,7 +941,7 @@ def render(result: AuditResult) -> str:
 {pack_cards}
 </div>
 
-{sections}
+{tab_markup}
 
 <footer>
   Generated by <code>python -m audit</code> from the

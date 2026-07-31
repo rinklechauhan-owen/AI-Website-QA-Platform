@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
-from audit import inventory as inventory_module
+from audit import assets, inventory as inventory_module
+from audit.assets import ImageSizeReport
 from audit.fetch import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, FetchError, Response, fetch
 from audit.findings import (
     Finding,
@@ -23,6 +24,7 @@ PACK_LABELS = {
     "seo": "SEO",
     "images": "Images",
     "links": "Links",
+    "assets": "Image weight",
 }
 
 
@@ -54,9 +56,12 @@ class AuditResult:
     byte_size: int
     packs: List[PackResult] = field(default_factory=list)
     document: Optional[Document] = None
-    # Extracts rather than findings — content listing, structure outline, image alt
-    # inventory, suggested schema.org markup. None when the page could not be parsed.
+    # Extracts rather than findings — heading list, structure outline, meta tags, canonical,
+    # robots directives, image alt inventory, schema.org. None if the page did not parse.
     inventory: Optional[PageInventory] = None
+    # Populated only when image weight checking is enabled; it costs a request per image.
+    image_sizes: Optional[ImageSizeReport] = None
+    headers: Dict[str, str] = field(default_factory=dict)
 
     @property
     def findings(self) -> List[Finding]:
@@ -100,6 +105,8 @@ class AuditResult:
         }
         if self.inventory is not None:
             payload["inventory"] = self.inventory.to_dict()
+        if self.image_sizes is not None:
+            payload["image_sizes"] = self.image_sizes.to_dict()
         return payload
 
 
@@ -118,6 +125,8 @@ def audit_url(
     verify_tls: bool = True,
     content_tags: Sequence[str] = inventory_module.DEFAULT_CONTENT_TAGS,
     outline_depth: int = inventory_module.DEFAULT_MAX_OUTLINE_DEPTH,
+    check_images: bool = False,
+    image_size_limit: int = assets.DEFAULT_SIZE_LIMIT,
 ) -> AuditResult:
     """Fetch and audit a single URL.
 
@@ -135,6 +144,8 @@ def audit_url(
         verify_tls,
         content_tags=content_tags,
         outline_depth=outline_depth,
+        check_images=check_images,
+        image_size_limit=image_size_limit,
     )
 
 
@@ -147,6 +158,8 @@ def audit_response(
     verify_tls: bool = True,
     content_tags: Sequence[str] = inventory_module.DEFAULT_CONTENT_TAGS,
     outline_depth: int = inventory_module.DEFAULT_MAX_OUTLINE_DEPTH,
+    check_images: bool = False,
+    image_size_limit: int = assets.DEFAULT_SIZE_LIMIT,
 ) -> AuditResult:
     """Audit an already-fetched response. Split out so tests can supply fixtures."""
     result = AuditResult(
@@ -156,6 +169,7 @@ def audit_response(
         fetched_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         elapsed_ms=response.elapsed_ms,
         byte_size=response.byte_size,
+        headers=dict(response.headers),
     )
 
     if response.status >= 400:
@@ -202,7 +216,10 @@ def audit_response(
     document = parse(response.body, response.url)
     result.document = document
     result.inventory = inventory_module.build(
-        document, content_tags=content_tags, max_outline_depth=outline_depth
+        document,
+        content_tags=content_tags,
+        max_outline_depth=outline_depth,
+        headers=response.headers,
     )
 
     for module in (seo, images):
@@ -216,6 +233,23 @@ def audit_response(
                 stats=stats,
             )
         )
+
+    if check_images:
+        pack_findings, stats, report = assets.run(
+            document, limit=image_size_limit, timeout=timeout, verify_tls=verify_tls
+        )
+        result.image_sizes = report
+        result.packs.append(
+            PackResult(
+                module=assets.MODULE,
+                label=PACK_LABELS[assets.MODULE],
+                score=score_from_findings(pack_findings),
+                findings=sort_findings(pack_findings),
+                stats=stats,
+            )
+        )
+    else:
+        result.image_sizes = ImageSizeReport(limit_bytes=image_size_limit, checked=False)
 
     if check_links:
         pack_findings, stats = links.run(

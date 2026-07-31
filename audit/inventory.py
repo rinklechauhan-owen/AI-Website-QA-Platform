@@ -15,8 +15,9 @@ from urllib.parse import urlparse
 
 from audit.parse import Document, ImageRef, Node, TextBlock
 
-# Content tags listed by default. Overridable per call.
-DEFAULT_CONTENT_TAGS = ("h1", "h2", "h3", "p")
+# Headings only by default — paragraphs are available via --content-tags when wanted, but
+# the heading outline is what a reviewer actually scans.
+DEFAULT_CONTENT_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 
 DEFAULT_MAX_OUTLINE_NODES = 400
 DEFAULT_MAX_OUTLINE_DEPTH = 8
@@ -465,12 +466,157 @@ def suggest_schema(doc: Document) -> SchemaSuggestion:
 # ---------------------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------------------
+# Meta tags
+# ---------------------------------------------------------------------------------------
+
+
+@dataclass
+class MetaTag:
+    kind: str  # name | property | http-equiv | charset | other
+    key: str
+    content: str
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.content.strip()
+
+
+def meta_tags(doc: Document) -> List[MetaTag]:
+    """Every <meta> on the page, normalised into (kind, key, content)."""
+    tags: List[MetaTag] = []
+    for raw in doc.metas:
+        content = raw.get("content", "")
+        for kind in ("name", "property", "http-equiv", "itemprop"):
+            if raw.get(kind):
+                tags.append(MetaTag(kind=kind, key=raw[kind], content=content))
+                break
+        else:
+            if "charset" in raw:
+                tags.append(MetaTag(kind="charset", key="charset", content=raw["charset"]))
+            else:
+                # A meta with neither a key attribute nor a charset does nothing.
+                label = ", ".join(f"{k}={v}" for k, v in raw.items()) or "(empty tag)"
+                tags.append(MetaTag(kind="other", key="(no name/property)", content=label))
+    return tags
+
+
+# ---------------------------------------------------------------------------------------
+# Canonical
+# ---------------------------------------------------------------------------------------
+
+
+@dataclass
+class CanonicalInfo:
+    declared: Optional[str] = None
+    page_url: str = ""
+    is_self_referencing: bool = False
+    is_absolute: bool = False
+    differs_only_by_trailing_slash: bool = False
+
+    @property
+    def present(self) -> bool:
+        return bool(self.declared)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "declared": self.declared,
+            "page_url": self.page_url,
+            "present": self.present,
+            "self_referencing": self.is_self_referencing,
+            "absolute": self.is_absolute,
+            "trailing_slash_only": self.differs_only_by_trailing_slash,
+        }
+
+
+def canonical_info(doc: Document) -> CanonicalInfo:
+    info = CanonicalInfo(declared=doc.canonical, page_url=doc.url)
+    if not doc.canonical:
+        return info
+
+    info.is_absolute = doc.canonical.startswith(("http://", "https://"))
+    info.is_self_referencing = doc.canonical.rstrip("/") == doc.url.rstrip("/")
+    info.differs_only_by_trailing_slash = (
+        info.is_self_referencing and doc.canonical != doc.url
+    )
+    return info
+
+
+# ---------------------------------------------------------------------------------------
+# Index / follow directives
+# ---------------------------------------------------------------------------------------
+
+
+@dataclass
+class IndexFollowInfo:
+    robots_meta: Optional[str] = None
+    googlebot_meta: Optional[str] = None
+    x_robots_tag: Optional[str] = None
+
+    @property
+    def directives(self) -> List[str]:
+        combined = ",".join(
+            part for part in (self.robots_meta, self.googlebot_meta, self.x_robots_tag) if part
+        )
+        return [d.strip().lower() for d in combined.split(",") if d.strip()]
+
+    @property
+    def indexable(self) -> bool:
+        return "noindex" not in self.directives and "none" not in self.directives
+
+    @property
+    def followable(self) -> bool:
+        return "nofollow" not in self.directives and "none" not in self.directives
+
+    @property
+    def summary(self) -> str:
+        return f"{'index' if self.indexable else 'noindex'}, {'follow' if self.followable else 'nofollow'}"
+
+    @property
+    def is_default(self) -> bool:
+        """True when nothing on the page changes the default index,follow behaviour."""
+        return not self.directives
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "robots_meta": self.robots_meta,
+            "googlebot_meta": self.googlebot_meta,
+            "x_robots_tag": self.x_robots_tag,
+            "directives": self.directives,
+            "indexable": self.indexable,
+            "followable": self.followable,
+            "summary": self.summary,
+        }
+
+
+def index_follow_info(doc: Document, headers: Optional[Dict[str, str]] = None) -> IndexFollowInfo:
+    """Robots directives from both the markup and the response headers.
+
+    X-Robots-Tag is checked because a header-level noindex is invisible in the HTML and is a
+    classic cause of "the page looks fine but will not rank".
+    """
+    headers = headers or {}
+    return IndexFollowInfo(
+        robots_meta=doc.meta("robots"),
+        googlebot_meta=doc.meta("googlebot"),
+        x_robots_tag=headers.get("x-robots-tag"),
+    )
+
+
+# ---------------------------------------------------------------------------------------
+# Combined
+# ---------------------------------------------------------------------------------------
+
+
 @dataclass
 class PageInventory:
     content: ContentInventory
     outline: StructureOutline
     images: ImageAltInventory
     schema: SchemaSuggestion
+    metas: List[MetaTag] = field(default_factory=list)
+    canonical: CanonicalInfo = field(default_factory=CanonicalInfo)
+    index_follow: IndexFollowInfo = field(default_factory=IndexFollowInfo)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -478,6 +624,11 @@ class PageInventory:
             "outline": self.outline.to_dict(),
             "images": self.images.to_dict(),
             "schema": self.schema.to_dict(),
+            "meta_tags": [
+                {"kind": m.kind, "key": m.key, "content": m.content} for m in self.metas
+            ],
+            "canonical": self.canonical.to_dict(),
+            "index_follow": self.index_follow.to_dict(),
         }
 
 
@@ -486,10 +637,14 @@ def build(
     content_tags: Sequence[str] = DEFAULT_CONTENT_TAGS,
     max_outline_nodes: int = DEFAULT_MAX_OUTLINE_NODES,
     max_outline_depth: int = DEFAULT_MAX_OUTLINE_DEPTH,
+    headers: Optional[Dict[str, str]] = None,
 ) -> PageInventory:
     return PageInventory(
         content=content_inventory(doc, content_tags),
         outline=structure_outline(doc, max_outline_nodes, max_outline_depth),
         images=image_alt_inventory(doc),
         schema=suggest_schema(doc),
+        metas=meta_tags(doc),
+        canonical=canonical_info(doc),
+        index_follow=index_follow_info(doc, headers),
     )

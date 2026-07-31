@@ -112,6 +112,11 @@ def _form_page(error: Optional[str] = None, url_value: str = "") -> str:
         <span><b>Check every link</b> — verifies each link resolves. Slower, makes extra
         requests to the target site.</span>
       </label>
+      <label class="opt">
+        <input type="checkbox" name="check_images" value="1" checked>
+        <span><b>Check image sizes</b> — measures each image to find any over 2.5&nbsp;MB.
+        One extra request per image.</span>
+      </label>
     </div>
     <button type="submit">Run audit</button>
   </form>
@@ -188,7 +193,11 @@ class _Handler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             requested = (params.get("url") or [""])[0]
             if requested:
-                self._run_audit(requested, check_links=bool(params.get("check_links")))
+                self._run_audit(
+                    requested,
+                    check_links=bool(params.get("check_links")),
+                    check_images=bool(params.get("check_images")),
+                )
             else:
                 self._send(_form_page())
             return
@@ -217,16 +226,17 @@ class _Handler(BaseHTTPRequestHandler):
         self._run_audit(
             (fields.get("url") or [""])[0],
             check_links=bool(fields.get("check_links")),
+            check_images=bool(fields.get("check_images")),
         )
 
-    def _run_audit(self, raw_url: str, check_links: bool) -> None:
+    def _run_audit(self, raw_url: str, check_links: bool, check_images: bool = False) -> None:
         url, error = _validate(raw_url)
         if error:
             self._send(_error_page(error, raw_url), status=400)
             return
 
         try:
-            result = audit_url(url, check_links=check_links)
+            result = audit_url(url, check_links=check_links, check_images=check_images)
         except FetchError as exc:
             self._send(_error_page(f"Could not fetch that page — {exc}", raw_url), status=502)
             return
