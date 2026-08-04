@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 from audit.assets import human_size
-from audit.report.theme import BASE_CSS, BRAND_MARK, icon
+from audit.report.theme import BASE_CSS, icon, logo_img
 from audit.engine import AuditResult, PackResult
 from audit.findings import Finding, Severity
 
@@ -56,18 +56,6 @@ def _ring(score: float) -> str:
 
 def _humanise(key: str) -> str:
     return key.replace("_", " ")
-
-
-def _pack_card(pack: PackResult) -> str:
-    issues = len(pack.findings)
-    label = "no issues" if issues == 0 else f"{issues} issue{'s' if issues != 1 else ''}"
-    return f"""<div class="pack-card">
-  <div class="name">{escape(pack.label)}</div>
-  <div class="val" style="color:{_score_color(pack.score)}">{pack.score:.0f}</div>
-  <div class="meter"><span style="width:{max(0.0, min(100.0, pack.score)):.1f}%;
-       background:{_score_color(pack.score)}"></span></div>
-  <div class="sub">{label}</div>
-</div>"""
 
 
 def _finding_block(finding: Finding) -> str:
@@ -452,7 +440,7 @@ def _schema_section(inventory) -> str:
         "than none.</p>"
     )
 
-    parts.append('  <div class="typerow">')
+    parts.append('  <div class="chiprow">')
     if schema.existing_types:
         for name in schema.existing_types:
             parts.append(f'    <span class="chip">already on page <b>{escape(name)}</b></span>')
@@ -822,9 +810,8 @@ def render(result: AuditResult, serving: bool = False) -> str:
 
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-mark">{BRAND_MARK}</span>
-      <span><span class="brand-name">Website QA</span><br>
-      <span class="brand-sub">Audit report</span></span>
+      {logo_img(26)}
+      <span class="brand-sub">Website QA &middot; Audit report</span>
     </div>
 {chr(10).join(nav_parts)}
     <div class="sidefoot">{side_card}</div>

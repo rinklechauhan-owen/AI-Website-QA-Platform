@@ -10,39 +10,39 @@ from html import escape
 from typing import List, Optional, Tuple
 
 from audit import __version__
-from audit.report.theme import BASE_CSS, BRAND_MARK, icon
+from audit.report.theme import BASE_CSS, icon, logo_img
 from audit.schemagen import SCHEMA_TYPES, GeneratedSchema
 
 # Extra rules for the two standalone pages. Everything else comes from the shared theme.
 _PAGE_CSS = """
 .formwrap { max-width: 760px; }
 .field { margin-bottom: 18px; }
-.field > label { display: block; font-size: 13px; font-weight: 620; margin-bottom: 7px; }
-.field .help { font-size: 12.5px; color: var(--ink-2); margin: 0 0 9px; }
+.field > label { display: block; font-size: var(--fs-sm); font-weight: var(--fw-semibold); margin-bottom: 7px; }
+.field .help { font-size: var(--fs-sm); color: var(--ink-2); margin: 0 0 9px; }
 input[type=url], input[type=text], select, textarea {
-  width: 100%; padding: 12px 14px; font-size: 14.5px; border-radius: var(--r-md);
+  width: 100%; padding: 12px 14px; font-size: var(--fs-base); border-radius: var(--r-md);
   border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink);
   font-family: inherit;
 }
 textarea { min-height: 250px; resize: vertical; line-height: 1.6;
-           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px;
                                             border-color: var(--accent); }
 .opts { display: flex; flex-direction: column; gap: 11px; margin: 16px 0 22px; }
-.opt { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--ink-2); }
+.opt { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); color: var(--ink-2); }
 .opt input { margin-top: 3px; flex: 0 0 auto; }
-.opt b { color: var(--ink); font-weight: 620; }
-.err { margin: 0 0 20px; padding: 13px 16px; border-radius: var(--r-md); font-size: 13.5px;
+.opt b { color: var(--ink); font-weight: var(--fw-semibold); }
+.err { margin: 0 0 20px; padding: 13px 16px; border-radius: var(--r-md); font-size: var(--fs-sm);
        background: var(--surface); border: 1px solid var(--bad); color: var(--bad);
        word-break: break-word; }
 .err b { display: block; margin-bottom: 3px; }
 .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 14px; }
 @media (max-width: 700px) { .two { grid-template-columns: minmax(0,1fr); } }
 .examples { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
-.examples li { font-size: 12.5px; color: var(--ink-2); }
+.examples li { font-size: var(--fs-sm); color: var(--ink-2); }
 .examples code { display: block; background: var(--surface-2); border: 1px solid var(--border);
                  border-radius: var(--r-sm); padding: 8px 10px; margin-top: 4px;
-                 white-space: pre-wrap; font-size: 11.5px; line-height: 1.55; }
+                 white-space: pre-wrap; font-size: var(--fs-xs); line-height: 1.55; }
 """
 
 
@@ -74,16 +74,16 @@ def _shell(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(title)}</title>
 <style>{BASE_CSS}{_PAGE_CSS}
-.navitem.active {{ background: var(--accent-soft); color: var(--accent); font-weight: 620; }}
+.navitem.active {{ background: var(--accent-soft); color: var(--accent);
+                   font-weight: var(--fw-semibold); }}
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-mark">{BRAND_MARK}</span>
-      <span><span class="brand-name">Website QA</span><br>
-      <span class="brand-sub">Audit toolkit</span></span>
+      {logo_img(26)}
+      <span class="brand-sub">Website QA &middot; Audit toolkit</span>
     </div>
     <p class="navgroup">Tools</p>
 {items}

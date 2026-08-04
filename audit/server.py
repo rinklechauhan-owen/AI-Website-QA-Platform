@@ -94,7 +94,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         # The report embeds text from the audited page; block any script regardless.
-        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+        self.send_header(
+            "Content-Security-Policy",
+            # The font and logo are inlined as data: URIs; everything else stays blocked,
+            # and script-src is absent so no script can run whatever the page contains.
+            "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:",
+        )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(payload)

@@ -93,8 +93,9 @@ nothing.
 It binds to `127.0.0.1` only, deliberately: the engine fetches whatever URL it is handed, so
 exposing it on a network would be handing out an open request proxy. Non-HTTP schemes
 (`file:`, `javascript:`, `data:`, `ftp:`) are rejected before reaching the fetcher, and every
-response carries a `Content-Security-Policy` of `default-src 'none'` because reports embed
-text taken from the audited page.
+response carries a `Content-Security-Policy` of `default-src 'none'` (plus `data:` for the
+inlined font and logo) because reports embed text taken from the audited page. `script-src` is
+absent entirely, so nothing can execute whatever a page contains.
 
 ---
 
@@ -104,7 +105,7 @@ Two layers, at different maturities. Being explicit about which is which:
 
 | Layer | State |
 | --- | --- |
-| [`audit`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, link, and image-weight rule packs; dashboard UI; 220 tests |
+| [`audit`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, link, and image-weight rule packs; dashboard UI; 241 tests |
 | [`services/api/`](services/api/) — FastAPI + Celery service | **Scaffold.** Models, schemas, task orchestration, and migrations wired; audit modules are registered stubs |
 | [`apps/web/`](apps/web/) — Next.js dashboard | **Scaffold.** Layout, typed API client, and scan form; no report views yet |
 
@@ -162,6 +163,26 @@ between pages; printing reveals every page at once.
 A **Dashboard** page leads: overall score ring, four stat cards, per-category meters, a
 severity breakdown, and response facts.
 
+### Design system
+
+[`audit/report/theme.py`](audit/report/theme.py) holds the whole visual language, shared by the
+report and the web UI so a saved file and a served page cannot drift apart.
+
+- **Type** — Montserrat, embedded as a variable WOFF2 data URI (38 KB covering weights
+  400–700, smaller than three static weights). One scale drives every size: `--fs-xs` 12px
+  through `--fs-2xl` 34px, with 14px as the body default. No component sets a raw pixel size;
+  a test enforces that.
+- **Colour** — `#3264f5` and `#5b95d2`, solid and as a `135°` gradient. Contrast decides which
+  does what: `#3264f5` is 4.91:1 on white so it carries text, links and solid fills, while
+  `#5b95d2` is only 3.15:1 — below the 4.5:1 AA threshold — so it stays decorative in light
+  mode and becomes the text accent in dark mode, where it reaches 6.11:1. A tool that audits
+  accessibility should not ship failing contrast of its own, so tests assert these ratios.
+- **Logo** — the Owen Media wordmark, inlined as a data URI. It is white on transparent, so it
+  sits on the brand gradient panel rather than a white sidebar where it would be invisible.
+
+Montserrat is redistributed under the SIL Open Font License; the licence ships alongside it in
+[`audit/report/assets/`](audit/report/assets/).
+
 Notes on two of them:
 
 - **Image Size** is the only check that fetches subresources, so it is opt-in via
@@ -187,7 +208,7 @@ can't be mistaken for a full audit.
 
 ## Tests
 
-220 tests, standard library `unittest`, no network access required:
+241 tests, standard library `unittest`, no network access required:
 
 ```bash
 python -m unittest discover -s tests -t . -v
