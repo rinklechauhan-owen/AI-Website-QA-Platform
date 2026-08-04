@@ -5,7 +5,7 @@ AI-powered website QA, design review, content review, and automated bug reportin
 Enter a URL, optionally attach a design file and a content document, and the platform crawls
 the site, runs technical audits, applies AI review passes, and produces a client-ready report.
 
-Full product spec: [docs/PRD.md](docs/PRD.md) &nbsp;·&nbsp; What has been built and why: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+Full product spec: [docs/PRD.md](docs/PRD.md) &nbsp;·&nbsp; Overview: [docs/SUMMARY.md](docs/SUMMARY.md) &nbsp;·&nbsp; Full record: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ---
 
