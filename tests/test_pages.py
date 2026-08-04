@@ -15,8 +15,8 @@ REQUIRED_TABS = [
     ("seo", "SEO"),
     ("headings", "Headings"),
     ("meta", "Meta Tags"),
-    ("canonical", "Canonical"),
-    ("alt", "Alt Missing"),
+    ("canonical", "Canonical URLs"),
+    ("alt", "Alt Tag Missing"),
     ("imgsize", "Image Size"),
     ("robots", "Index / Follow"),
     ("schema", "Schema"),
@@ -40,19 +40,20 @@ class TestTabLayout(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
 
     def test_exactly_one_tab_starts_selected(self):
-        self.assertEqual(self.html.count('name="qa-tabs"'), self.html.count("<input type=\"radio\""))
+        self.assertEqual(self.html.count('name="qa-nav"'), self.html.count('<input type="radio"'))
         self.assertEqual(self.html.count(" checked>"), 1)
 
     def test_first_tab_is_the_selected_one(self):
-        first = re.search(r'<input type="radio" name="qa-tabs" id="tab-(\w+)" checked>', self.html)
+        first = re.search(r'<input type="radio" name="qa-nav" id="tab-(\w+)" checked>', self.html)
         self.assertIsNotNone(first)
+        self.assertEqual(first.group(1), "overview", "the dashboard should open first")
 
     def test_switching_needs_no_javascript(self):
         self.assertNotIn("<script", self.html.lower())
         self.assertNotIn("onclick", self.html.lower())
         for key, _ in REQUIRED_TABS:
             with self.subTest(tab=key):
-                self.assertIn(f"#tab-{key}:checked ~ .panels > #panel-{key}", self.html)
+                self.assertIn(f"#tab-{key}:checked ~ .main .panels > #panel-{key}", self.html)
 
     def test_every_panel_has_a_matching_radio_and_label(self):
         panels = set(re.findall(r'id="panel-([\w-]+)"', self.html))
@@ -72,11 +73,13 @@ class TestTabLayout(unittest.TestCase):
     def test_links_tab_only_appears_when_links_were_checked(self):
         self.assertNotIn('id="panel-links"', self.html)
 
-    def test_http_error_promotes_an_http_tab_to_the_front(self):
+    def test_http_error_gets_its_own_page(self):
         result = audit_response(response("<html></html>", status=503), "https://acme.test/")
         html = html_report.render(result)
         self.assertIn('id="panel-http"', html)
-        self.assertIn('id="tab-http" checked', html)
+        # The dashboard still opens first; it surfaces the status in the Response card.
+        self.assertIn('id="tab-overview" checked', html)
+        self.assertIn("HTTP 503", html)
 
 
 class TestHeadingsTab(unittest.TestCase):

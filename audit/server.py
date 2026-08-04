@@ -7,7 +7,6 @@ so exposing this on a network would hand out a request proxy.
 
 from __future__ import annotations
 
-import html as html_module
 import json
 import re
 import socket
@@ -21,12 +20,17 @@ from audit import __version__
 from audit.engine import audit_url
 from audit.fetch import FetchError
 from audit.report import html as html_report
+from audit.report import pages as page_views
+from audit.schemagen import VALID_TYPES, GeneratedSchema, generate
 
 DEFAULT_PORT = 8765
 DEFAULT_HOST = "127.0.0.1"
 
 # Refuse absurd inputs before spending a network round trip on them.
 MAX_URL_LENGTH = 2048
+
+# Room for a pasted page of markup in the schema generator.
+MAX_BODY_BYTES = 512 * 1024
 
 # Schemes that must never reach the fetcher, even though it would fail on them anyway —
 # a clear rejection beats a confusing connection error.
@@ -41,96 +45,6 @@ BLOCKED_SCHEMES = frozenset(
 # port rather than a scheme, so the two cases are told apart below.
 _LEADING_SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.\-]*):")
 _SCHEME_WITH_AUTHORITY = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://")
-
-_FORM_CSS = """
-* { box-sizing: border-box; }
-:root {
-  color-scheme: light dark;
-  --bg: #f7f8fa; --card: #fff; --border: #e4e7ec; --ink: #101828;
-  --ink-muted: #667085; --ink-faint: #98a2b3; --accent: #2563eb; --bad: #d92d20;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0c111d; --card: #161b26; --border: #262b37; --ink: #f5f5f6;
-          --ink-muted: #94969c; --ink-faint: #6c6f7a; --accent: #60a5fa; --bad: #f97066; }
-}
-body { margin: 0; min-height: 100vh; display: flex; align-items: center;
-       justify-content: center; padding: 32px 20px; background: var(--bg); color: var(--ink);
-       font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-.card { width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--border);
-        border-radius: 16px; padding: 36px; box-shadow: 0 1px 3px rgba(16,24,40,.1); }
-.eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
-           color: var(--ink-faint); font-weight: 600; margin: 0 0 8px; }
-h1 { font-size: 23px; margin: 0 0 8px; font-weight: 650; letter-spacing: -.01em; }
-.lede { margin: 0 0 26px; color: var(--ink-muted); font-size: 14px; }
-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
-input[type=url] { width: 100%; padding: 13px 15px; font-size: 15px; border-radius: 10px;
-                  border: 1px solid var(--border); background: var(--bg); color: var(--ink); }
-input[type=url]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.opts { margin: 18px 0 24px; display: flex; flex-direction: column; gap: 11px; }
-.opt { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px;
-       color: var(--ink-muted); }
-.opt input { margin-top: 3px; }
-.opt b { color: var(--ink); font-weight: 600; }
-button { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; border: none;
-         border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; }
-button:hover { filter: brightness(1.08); }
-.err { margin: 0 0 20px; padding: 13px 15px; border-radius: 10px; font-size: 13.5px;
-       background: color-mix(in srgb, var(--bad) 12%, transparent);
-       border: 1px solid var(--bad); color: var(--bad); word-break: break-word; }
-.hint { margin: 22px 0 0; font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
-.back { display: inline-block; margin: 0 0 18px; font-size: 13px; color: var(--accent);
-        text-decoration: none; }
-.back:hover { text-decoration: underline; }
-"""
-
-
-def _form_page(error: Optional[str] = None, url_value: str = "") -> str:
-    error_block = f'<p class="err">{html_module.escape(error)}</p>' if error else ""
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Website QA Audit</title>
-<style>{_FORM_CSS}</style>
-</head>
-<body>
-<div class="card">
-  <p class="eyebrow">AI Website QA Platform</p>
-  <h1>Audit a page</h1>
-  <p class="lede">Paste a URL. You will get SEO, image, and structure findings, a content
-  listing, and generated schema.org markup.</p>
-  {error_block}
-  <form method="post" action="/audit">
-    <label for="url">Website URL</label>
-    <input id="url" name="url" type="url" required autofocus
-           placeholder="https://example.com"
-           value="{html_module.escape(url_value, quote=True)}">
-    <div class="opts">
-      <label class="opt">
-        <input type="checkbox" name="check_links" value="1">
-        <span><b>Check every link</b> — verifies each link resolves. Slower, makes extra
-        requests to the target site.</span>
-      </label>
-      <label class="opt">
-        <input type="checkbox" name="check_images" value="1" checked>
-        <span><b>Check image sizes</b> — measures each image to find any over 2.5&nbsp;MB.
-        One extra request per image.</span>
-      </label>
-    </div>
-    <button type="submit">Run audit</button>
-  </form>
-  <p class="hint">Analyses the served HTML. Performance, accessibility rules, and visual
-  review need the browser-based modules and are not included. Version {__version__}.</p>
-</div>
-</body>
-</html>
-"""
-
-
-def _error_page(message: str, url_value: str) -> str:
-    return _form_page(error=message, url_value=url_value)
-
 
 def _validate(raw_url: str) -> Tuple[Optional[str], Optional[str]]:
     """Return (url, error). Adds https:// when no scheme is given.
@@ -199,18 +113,23 @@ class _Handler(BaseHTTPRequestHandler):
                     check_images=bool(params.get("check_images")),
                 )
             else:
-                self._send(_form_page())
+                self._send(page_views.audit_form())
+            return
+
+        if parsed.path == "/schema":
+            self._send(page_views.schema_generator())
             return
 
         if parsed.path == "/health":
             self._send(json.dumps({"status": "ok", "version": __version__}), content_type="application/json")
             return
 
-        self._send(_form_page(error="Page not found."), status=404)
+        self._send(page_views.audit_form(error="Page not found."), status=404)
 
     def do_POST(self) -> None:  # noqa: N802 - name fixed by the base class
-        if urlparse(self.path).path != "/audit":
-            self._send(_form_page(error="Page not found."), status=404)
+        route = urlparse(self.path).path
+        if route not in ("/audit", "/schema"):
+            self._send(page_views.audit_form(error="Page not found."), status=404)
             return
 
         try:
@@ -218,42 +137,63 @@ class _Handler(BaseHTTPRequestHandler):
         except ValueError:
             length = 0
 
-        if length <= 0 or length > 64 * 1024:
-            self._send(_error_page("Malformed request.", ""), status=400)
+        if length <= 0 or length > MAX_BODY_BYTES:
+            self._send(page_views.audit_form(error="Malformed request."), status=400)
             return
 
-        fields = parse_qs(self.rfile.read(length).decode("utf-8", errors="replace"))
+        fields = parse_qs(
+            self.rfile.read(length).decode("utf-8", errors="replace"), keep_blank_values=True
+        )
+
+        if route == "/schema":
+            self._generate_schema(fields)
+            return
+
         self._run_audit(
             (fields.get("url") or [""])[0],
             check_links=bool(fields.get("check_links")),
             check_images=bool(fields.get("check_images")),
         )
 
+    def _generate_schema(self, fields) -> None:
+        content = (fields.get("content") or [""])[0]
+        schema_type = (fields.get("schema_type") or ["auto"])[0]
+        if schema_type not in VALID_TYPES:
+            schema_type = "auto"
+
+        try:
+            result = generate(content, schema_type)
+        except Exception as exc:  # noqa: BLE001 - a bad paste must not kill the server
+            result = GeneratedSchema(schema_type=schema_type)
+            result.warnings.append(
+                f"Could not process that content — {exc.__class__.__name__}: {exc}"
+            )
+            self._send(page_views.schema_generator(content, schema_type, result), status=500)
+            return
+
+        self._send(page_views.schema_generator(content, schema_type, result))
+
     def _run_audit(self, raw_url: str, check_links: bool, check_images: bool = False) -> None:
         url, error = _validate(raw_url)
         if error:
-            self._send(_error_page(error, raw_url), status=400)
+            self._send(page_views.audit_form(error, raw_url), status=400)
             return
 
         try:
             result = audit_url(url, check_links=check_links, check_images=check_images)
         except FetchError as exc:
-            self._send(_error_page(f"Could not fetch that page — {exc}", raw_url), status=502)
+            self._send(page_views.audit_form(f"Could not fetch that page — {exc}", raw_url),
+                       status=502)
             return
         except Exception as exc:  # noqa: BLE001 - never take the server down for one bad page
             self._send(
-                _error_page(f"Audit failed: {exc.__class__.__name__}: {exc}", raw_url), status=500
+                page_views.audit_form(f"Audit failed: {exc.__class__.__name__}: {exc}", raw_url),
+                status=500,
             )
             return
 
-        page = html_report.render(result)
-        # Give the reader a route back to the form without using the browser's back button.
-        page = page.replace(
-            '<div class="wrap">',
-            '<div class="wrap">\n<a class="back" href="/">&larr; Audit another page</a>',
-            1,
-        )
-        self._send(page)
+        # serving=True adds the sidebar links only a running server can honour.
+        self._send(html_report.render(result, serving=True))
 
 
 def _port_available(host: str, port: int) -> bool:

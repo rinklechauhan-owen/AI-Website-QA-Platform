@@ -76,8 +76,19 @@ Exit codes: `0` clean, `1` findings at or above `--fail-on`, `2` the page could 
 ### The web UI
 
 `--serve` runs a local server built on `http.server` — still no third-party packages. Paste a
-URL, choose whether to check links and image sizes, and the same tabbed HTML report renders in
-the browser.
+URL, choose whether to check links and image sizes, and the same dashboard renders in the
+browser.
+
+It also carries a **Schema Generator** page at `/schema`: paste HTML or plain text, pick a
+type (or let it auto-detect), and get schema.org JSON-LD back. It reads `Key: value` lines for
+specific fields, turns lines ending in `?` into an FAQ, and numbered lines into a how-to.
+Supported types: Article, FAQPage, HowTo, Organization, LocalBusiness, Product, Event,
+BreadcrumbList, WebPage.
+
+The same rule applies as everywhere else: nothing is invented. Advisory gaps become notes and
+the markup is still emitted; a missing **required** property blocks output entirely, because
+handing someone invalid structured data with a caveat attached is worse than handing them
+nothing.
 
 It binds to `127.0.0.1` only, deliberately: the engine fetches whatever URL it is handed, so
 exposing it on a network would be handing out an open request proxy. Non-HTTP schemes
@@ -93,7 +104,7 @@ Two layers, at different maturities. Being explicit about which is which:
 
 | Layer | State |
 | --- | --- |
-| [`audit`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, link, and image-weight rule packs; tabbed reports; 173 tests |
+| [`audit`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, link, and image-weight rule packs; dashboard UI; 220 tests |
 | [`services/api/`](services/api/) — FastAPI + Celery service | **Scaffold.** Models, schemas, task orchestration, and migrations wired; audit modules are registered stubs |
 | [`apps/web/`](apps/web/) — Next.js dashboard | **Scaffold.** Layout, typed API client, and scan form; no report views yet |
 
@@ -125,28 +136,31 @@ mixed-content images on HTTPS pages, plain-HTTP links.
 Each finding carries a stable rule ID, a severity, and a specific fix — not just a label.
 Scores start at 100 per pack and deduct by severity; `info` findings never reduce a score.
 
-### Report tabs
+### Report pages
 
-The HTML report is organised into tabs, in this order:
+The report is a dashboard with sidebar navigation. Pages, in order:
 
-| Tab | Contents |
+| Page | Contents |
 | --- | --- |
 | **SEO** | Findings from the SEO rule pack |
 | **Headings** | Every H1–H6 in document order, indented by level, with line numbers |
 | **Meta Tags** | Every `<meta>` element as served — name, property, http-equiv, charset |
-| **Canonical** | Declared canonical, whether it is absolute and self-referencing |
-| **Alt Missing** | Source URL of every image with no `alt` or an empty one |
+| **Canonical URLs** | Declared canonical, whether it is absolute and self-referencing |
+| **Alt Tag Missing** | Source URL of every image with no `alt` or an empty one |
 | **Image Size** | Images heavier than 2.5 MB (needs `--check-images`) |
 | **Index / Follow** | Robots directives from the markup *and* the `X-Robots-Tag` header |
 | **Schema** | Generated schema.org JSON-LD, ready to paste |
 | **Image Issues** | Remaining image findings — lazy loading, dimensions, formats |
-| **Structure** | Nested outline of the document's structural elements |
+| **Page Structure** | Nested outline of the document's structural elements |
 | **Links** | Broken-link findings (only when `--check-links` ran) |
 
-Tabs are **radio inputs plus `:checked` selectors** — no JavaScript, so a saved report still
-switches tabs when opened offline from disk, and the strict Content-Security-Policy holds. The
-radios stay keyboard-focusable and exposed to assistive technology, so arrow keys move between
-tabs; printing reveals every panel at once.
+Navigation is **radio inputs plus `:checked` selectors** — no JavaScript, so a saved report
+still navigates when opened offline from disk, and the strict Content-Security-Policy holds.
+The radios stay keyboard-focusable and exposed to assistive technology, so arrow keys move
+between pages; printing reveals every page at once.
+
+A **Dashboard** page leads: overall score ring, four stat cards, per-category meters, a
+severity breakdown, and response facts.
 
 Notes on two of them:
 
@@ -173,7 +187,7 @@ can't be mistaken for a full audit.
 
 ## Tests
 
-173 tests, standard library `unittest`, no network access required:
+220 tests, standard library `unittest`, no network access required:
 
 ```bash
 python -m unittest discover -s tests -t . -v
@@ -228,9 +242,10 @@ audit/                  Dependency-free audit engine, CLI, and web UI
   findings.py           Finding dataclass, severity weighting, scoring
   inventory.py          Content listing, structure outline, alt inventory, schema.org
   engine.py             Orchestration and result aggregation
-  server.py             http.server web UI for --serve
+  server.py             http.server web UI for --serve and /schema
   rules/                seo.py · images.py · links.py
-  report/               html.py (self-contained) · terminal.py
+  schemagen.py          Standalone content-to-JSON-LD generator
+  report/               html.py (dashboard) · pages.py (forms) · theme.py · terminal.py
 apps/
   web/                  Next.js 15 + TypeScript + Tailwind front end
 services/

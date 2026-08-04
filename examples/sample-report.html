@@ -5,303 +5,463 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QA Audit — Home</title>
 <style>
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
 :root {
   color-scheme: light dark;
-  --bg: #f7f8fa;
-  --card: #ffffff;
-  --border: #e4e7ec;
-  --ink: #101828;
-  --ink-muted: #667085;
-  --ink-faint: #98a2b3;
-  --accent: #2563eb;
-  --critical: #b42318;
-  --high: #d92d20;
-  --medium: #dc6803;
-  --low: #0e7490;
-  --info: #667085;
-  --good: #12b76a;
-  --warn: #f79009;
-  --bad: #f04438;
-  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
+
+  --accent:        #0f7a52;
+  --accent-hover:  #0c6544;
+  --accent-ink:    #ffffff;
+  --accent-soft:   #e6f4ee;
+  --accent-line:   #bfe3d3;
+
+  --bg:            #f4f6f5;
+  --surface:       #ffffff;
+  --surface-2:     #fafbfa;
+  --border:        #e5e8e7;
+  --border-strong: #d4d9d7;
+
+  --ink:           #0f1a16;
+  --ink-2:         #5b6b64;
+  --ink-3:         #93a09a;
+
+  --critical: #a8231b;
+  --high:     #cf3a2c;
+  --medium:   #c47510;
+  --low:      #0d7490;
+  --info:     #6b7b74;
+  --good:     #12805c;
+  --warn:     #d98218;
+  --bad:      #d64535;
+
+  --r-xl: 20px;
+  --r-lg: 16px;
+  --r-md: 11px;
+  --r-sm: 8px;
+
+  --shadow-sm: 0 1px 2px rgba(15,26,22,.05);
+  --shadow-md: 0 1px 3px rgba(15,26,22,.06), 0 6px 16px -8px rgba(15,26,22,.12);
+
+  --sidebar-w: 260px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c111d;
-    --card: #161b26;
-    --border: #262b37;
-    --ink: #f5f5f6;
-    --ink-muted: #94969c;
-    --ink-faint: #6c6f7a;
-    --accent: #60a5fa;
+    --accent:        #2ea87a;
+    --accent-hover:  #37bb89;
+    --accent-ink:    #06221a;
+    --accent-soft:   #12352a;
+    --accent-line:   #1d4e3c;
+
+    --bg:            #0b0f0e;
+    --surface:       #141a18;
+    --surface-2:     #191f1d;
+    --border:        #242c29;
+    --border-strong: #313b37;
+
+    --ink:           #eef2f0;
+    --ink-2:         #9aa8a2;
+    --ink-3:         #6b7a74;
+
     --critical: #fda29b;
-    --high: #f97066;
-    --medium: #fdb022;
-    --low: #67e8f9;
-    --info: #94969c;
-    --shadow: none;
+    --high:     #f58b7f;
+    --medium:   #f0b054;
+    --low:      #67d8e8;
+    --info:     #9aa8a2;
+    --good:     #34d399;
+    --warn:     #f0b054;
+    --bad:      #f58b7f;
+
+    --shadow-sm: none;
+    --shadow-md: none;
   }
 }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
-  padding: 40px 20px 72px;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font: 15px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.wrap { max-width: 940px; margin: 0 auto; }
+a { color: var(--accent); }
 
-/* --- header --- */
-.head { display: flex; flex-wrap: wrap; gap: 28px; align-items: center;
-        background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-        padding: 28px; box-shadow: var(--shadow); }
-.head-main { flex: 1 1 380px; min-width: 0; }
-.eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
-           color: var(--ink-faint); font-weight: 600; margin: 0 0 8px; }
-h1 { font-size: 21px; line-height: 1.3; margin: 0 0 6px; font-weight: 650; word-break: break-word; }
-.url { margin: 0 0 14px; font-size: 13px; word-break: break-all; }
-.url a { color: var(--accent); text-decoration: none; }
-.url a:hover { text-decoration: underline; }
-.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; font-size: 12.5px;
-         color: var(--ink-muted); list-style: none; padding: 0; }
-.facts b { color: var(--ink); font-weight: 600; }
+code, .mono, pre {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
 
-/* --- score ring --- */
-.ring { position: relative; width: 128px; height: 128px; flex: 0 0 auto; }
+/* ---------------------------------------------------------------- app shell */
+
+.app { position: relative; display: grid; grid-template-columns: var(--sidebar-w) minmax(0,1fr);
+       min-height: 100vh; }
+.app > input[type=radio] {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; white-space: nowrap; clip: rect(0 0 0 0); clip-path: inset(50%); border: 0;
+}
+
+.sidebar { position: sticky; top: 0; align-self: start; height: 100vh; display: flex;
+           flex-direction: column; gap: 6px; padding: 22px 14px; background: var(--surface);
+           border-right: 1px solid var(--border); overflow-y: auto; }
+
+.brand { display: flex; align-items: center; gap: 11px; padding: 4px 10px 20px; }
+.brand-mark { color: var(--accent); display: flex; }
+.brand-name { font-size: 16px; font-weight: 680; letter-spacing: -.015em; line-height: 1.15; }
+.brand-sub { font-size: 11px; color: var(--ink-3); font-weight: 500; }
+
+.navgroup { margin: 16px 10px 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+            text-transform: uppercase; color: var(--ink-3); }
+
+.navitem { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: var(--r-md);
+           font-size: 14px; font-weight: 520; color: var(--ink-2); cursor: pointer;
+           user-select: none; text-decoration: none; line-height: 1.3; }
+.navitem:hover { background: var(--surface-2); color: var(--ink); }
+.navitem svg { flex: 0 0 auto; opacity: .85; }
+.navitem .navlabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                     white-space: nowrap; }
+.navitem .pill { flex: 0 0 auto; min-width: 21px; text-align: center; padding: 1px 7px;
+                 border-radius: 999px; font-size: 11px; font-weight: 650;
+                 background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-2); }
+.navitem .pill.hot { background: var(--bad); border-color: var(--bad); color: #fff; }
+@media (prefers-color-scheme: dark) { .navitem .pill.hot { color: #14100f; } }
+
+.sidefoot { margin-top: auto; padding-top: 18px; }
+.sidecard { background: linear-gradient(155deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: var(--accent-ink); border-radius: var(--r-lg); padding: 17px 16px; }
+.sidecard h4 { margin: 0 0 5px; font-size: 13.5px; font-weight: 660; }
+.sidecard p { margin: 0; font-size: 12px; opacity: .88; line-height: 1.55; }
+.sidecard code { display: block; margin-top: 11px; padding: 7px 9px; border-radius: var(--r-sm);
+                 background: rgba(255,255,255,.16); font-size: 11.5px; word-break: break-all; }
+
+/* ---------------------------------------------------------------- main */
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+
+.topbar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+          padding: 20px 30px; border-bottom: 1px solid var(--border);
+          background: var(--surface); }
+.topbar-main { flex: 1 1 320px; min-width: 0; }
+.crumb { font-size: 11px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase;
+         color: var(--ink-3); margin: 0 0 5px; }
+.topbar h1 { margin: 0; font-size: 20px; font-weight: 680; letter-spacing: -.02em;
+             line-height: 1.25; word-break: break-word; }
+.topbar .sub { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); word-break: break-all; }
+.topbar .sub a { text-decoration: none; }
+.topbar .sub a:hover { text-decoration: underline; }
+.topbar-side { display: flex; gap: 9px; align-items: center; flex: 0 0 auto; }
+
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px;
+       border-radius: 999px; font-size: 13.5px; font-weight: 600; text-decoration: none;
+       border: 1px solid var(--border-strong); color: var(--ink); background: var(--surface);
+       cursor: pointer; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.content { padding: 26px 30px 60px; }
+
+/* ---------------------------------------------------------------- cards */
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm); }
+.card-pad { padding: 20px 22px; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+             flex-wrap: wrap; margin-bottom: 15px; }
+.card-title { font-size: 14.5px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.card-note { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+
+.grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 14px;
+          margin-top: 14px; align-items: start; }
+@media (max-width: 1080px) { .grid-2 { grid-template-columns: minmax(0,1fr); } }
+
+/* stat cards */
+.stat { position: relative; padding: 18px 20px 17px; border-radius: var(--r-lg);
+        background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.stat .k { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 0 0 12px;
+           padding-right: 34px; }
+.stat .v { font-size: 33px; font-weight: 700; letter-spacing: -.035em; line-height: 1;
+           margin: 0 0 9px; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: 11.5px; color: var(--ink-3); margin: 0; display: flex; align-items: center;
+           gap: 6px; }
+.stat .corner { position: absolute; top: 15px; right: 15px; width: 27px; height: 27px;
+                border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                border: 1px solid var(--border); color: var(--ink-2); }
+.stat.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.stat.accent .k, .stat.accent .d { color: var(--accent-ink); opacity: .9; }
+.stat.accent .corner { border-color: rgba(255,255,255,.35); color: var(--accent-ink); }
+.stat .tone { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+              border-radius: 999px; font-weight: 620; background: var(--surface-2);
+              border: 1px solid var(--border); }
+.stat.accent .tone { background: rgba(255,255,255,.17); border-color: transparent; }
+
+/* score ring */
+.ring { position: relative; width: 132px; height: 132px; flex: 0 0 auto; margin: 0 auto; }
 .ring svg { transform: rotate(-90deg); }
 .ring-track { stroke: var(--border); }
 .ring-val { stroke-linecap: round; }
 .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column;
              align-items: center; justify-content: center; }
-.ring-num { font-size: 31px; font-weight: 680; letter-spacing: -.02em; line-height: 1; }
-.ring-of { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase;
-           letter-spacing: .08em; margin-top: 5px; }
+.ring-num { font-size: 33px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+            font-variant-numeric: tabular-nums; }
+.ring-of { font-size: 10px; color: var(--ink-3); text-transform: uppercase;
+           letter-spacing: .09em; margin-top: 6px; font-weight: 600; }
 
-/* --- severity chips --- */
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
-.chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 6px 13px;
-        border-radius: 999px; border: 1px solid var(--border); background: var(--card);
-        font-size: 12.5px; color: var(--ink-muted); }
-.chip b { font-size: 14px; font-weight: 660; }
-.chip.critical b { color: var(--critical); }
-.chip.high b { color: var(--high); }
-.chip.medium b { color: var(--medium); }
-.chip.low b { color: var(--low); }
-.chip.info b { color: var(--info); }
+/* horizontal meters */
+.meters { display: flex; flex-direction: column; gap: 15px; }
+.meter-row .mt { display: flex; justify-content: space-between; align-items: baseline;
+                 gap: 10px; margin-bottom: 7px; font-size: 13px; }
+.meter-row .mt b { font-weight: 660; font-variant-numeric: tabular-nums; }
+.meter-row .mt span { color: var(--ink-2); }
+.meter { height: 7px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 999px; }
 
-/* --- pack summary cards --- */
-.packs { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-         gap: 12px; margin: 12px 0 0; }
-.pack-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-             padding: 16px 18px; box-shadow: var(--shadow); }
-.pack-card .name { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
-                   color: var(--ink-faint); font-weight: 600; }
-.pack-card .val { font-size: 26px; font-weight: 660; letter-spacing: -.02em; margin: 6px 0 10px; }
-.meter { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
-.meter span { display: block; height: 100%; border-radius: 999px; }
-.pack-card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 9px; }
+/* severity legend */
+.legend { display: flex; flex-direction: column; gap: 10px; }
+.legend-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.legend-row .lbl { flex: 1 1 auto; color: var(--ink-2); }
+.legend-row .num { font-weight: 660; font-variant-numeric: tabular-nums; }
 
-/* --- sections --- */
-section { margin-top: 40px; }
-h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
-     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.count-pill { font-size: 11.5px; font-weight: 600; color: var(--ink-muted);
-              background: var(--bg); border: 1px solid var(--border);
-              padding: 2px 9px; border-radius: 999px; }
-.section-note { margin: 0 0 16px; font-size: 12.5px; color: var(--ink-muted); }
+.factlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.factlist li { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0;
+               border-bottom: 1px solid var(--border); font-size: 13px; }
+.factlist li:last-child { border-bottom: none; }
+.factlist .fk { color: var(--ink-2); flex: 0 0 auto; }
+.factlist .fv { font-weight: 600; text-align: right; word-break: break-all; min-width: 0; }
 
-/* --- stats --- */
-.stats { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }
-.stats li { font-size: 12px; color: var(--ink-muted); background: var(--card);
-            border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; }
-.stats b { color: var(--ink); font-weight: 620; }
+/* ---------------------------------------------------------------- panels */
 
-/* --- findings --- */
-.finding { background: var(--card); border: 1px solid var(--border);
-           border-left: 3px solid var(--border); border-radius: 10px;
-           padding: 16px 18px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.panel { display: none; }
+.panel > section { margin: 0 0 20px; }
+.panel > section:last-child { margin-bottom: 0; }
+
+section > h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+               font-size: 16px; font-weight: 670; margin: 0 0 4px; letter-spacing: -.015em; }
+.count-pill { font-size: 11.5px; font-weight: 620; color: var(--ink-2); background: var(--surface);
+              border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px; }
+.section-note { margin: 0 0 16px; font-size: 13px; color: var(--ink-2); max-width: 78ch; }
+
+/* findings */
+.finding { background: var(--surface); border: 1px solid var(--border);
+           border-left: 3px solid var(--border); border-radius: var(--r-md);
+           padding: 15px 18px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
 .finding.critical { border-left-color: var(--critical); }
 .finding.high     { border-left-color: var(--high); }
 .finding.medium   { border-left-color: var(--medium); }
 .finding.low      { border-left-color: var(--low); }
 .finding.info     { border-left-color: var(--info); }
-
 .f-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+.badge { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
          padding: 3px 8px; border-radius: 5px; flex: 0 0 auto; color: #fff; }
 .badge.critical { background: var(--critical); }
 .badge.high     { background: var(--high); }
 .badge.medium   { background: var(--medium); }
 .badge.low      { background: var(--low); }
 .badge.info     { background: var(--info); }
-@media (prefers-color-scheme: dark) { .badge { color: #0c111d; } }
+@media (prefers-color-scheme: dark) { .badge { color: #0b0f0e; } }
+.f-title { font-weight: 620; font-size: 14px; flex: 1 1 240px; min-width: 0; word-break: break-word; }
+.f-rule { font-size: 11.5px; color: var(--ink-3); }
+.f-detail { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); word-break: break-word; }
+.f-el { margin: 9px 0 0; padding: 9px 11px; background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--r-sm); font-size: 12px; color: var(--ink-2); overflow-x: auto;
+        white-space: pre-wrap; word-break: break-all; }
+.f-fix { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--accent-line);
+         font-size: 13px; color: var(--ink-2); }
+.f-fix b { color: var(--ink); font-weight: 640; }
 
-.f-title { font-weight: 600; font-size: 14.5px; flex: 1 1 260px; min-width: 0;
-           word-break: break-word; }
-.f-rule { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          font-size: 11.5px; color: var(--ink-faint); }
-.f-detail { margin: 9px 0 0; font-size: 13.5px; color: var(--ink-muted); word-break: break-word; }
-.f-el { margin: 10px 0 0; padding: 9px 11px; background: var(--bg); border: 1px solid var(--border);
-        border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px; color: var(--ink-muted); overflow-x: auto; white-space: pre-wrap;
-        word-break: break-all; }
-.f-fix { margin: 11px 0 0; padding-left: 12px; border-left: 2px solid var(--border);
-         font-size: 13.5px; }
-.f-fix b { font-weight: 620; }
-
-.clean { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-         padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
+.clean { background: var(--accent-soft); border: 1px solid var(--accent-line);
+         border-radius: var(--r-md); padding: 16px 18px; font-size: 13.5px; color: var(--ink-2); }
 .clean b { color: var(--good); }
 
-/* --- tabs (radio + :checked, so the report needs no JavaScript) --- */
-.tabs { margin-top: 34px; }
-/* Visually hidden but still focusable and exposed to assistive technology. Zero width and
-   height, or display:none, would drop the radios out of the accessibility tree and leave the
-   tabs keyboard-unreachable. */
-.tabs > input[type=radio] { position: absolute; width: 1px; height: 1px; margin: -1px;
-                            padding: 0; overflow: hidden; white-space: nowrap;
-                            clip: rect(0 0 0 0); clip-path: inset(50%); border: 0; }
-.tablist { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--border);
-           margin-bottom: 26px; scrollbar-width: thin; }
-.tablist label { flex: 0 0 auto; padding: 10px 15px; cursor: pointer; font-size: 13.5px;
-                 font-weight: 550; color: var(--ink-muted); white-space: nowrap;
-                 border-bottom: 2px solid transparent; margin-bottom: -1px;
-                 border-radius: 7px 7px 0 0; user-select: none; }
-.tablist label:hover { color: var(--ink); background: var(--card); }
-.tablist .badge-n { display: inline-block; margin-left: 7px; padding: 1px 7px;
-                    border-radius: 999px; font-size: 11px; font-weight: 650;
-                    background: var(--bg); border: 1px solid var(--border);
-                    color: var(--ink-muted); }
-.tablist label.warn .badge-n { background: var(--high); border-color: var(--high); color: #fff; }
-@media (prefers-color-scheme: dark) { .tablist label.warn .badge-n { color: #0c111d; } }
-.panel { display: none; }
-.panel > section:first-child { margin-top: 0; }
-
-/* --- inventory: content listing --- */
-.blocks { display: flex; flex-direction: column; gap: 1px; background: var(--border);
-          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.block { display: flex; gap: 12px; padding: 10px 14px; background: var(--card);
-         align-items: baseline; }
-.block .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-              font-size: 11px; font-weight: 700; text-transform: uppercase; flex: 0 0 34px;
-              color: var(--ink-faint); }
+/* blocks list (headings) */
+.blocks { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+          background: var(--border); display: flex; flex-direction: column; gap: 1px; }
+.block { display: flex; gap: 13px; padding: 11px 15px; background: var(--surface); align-items: baseline; }
+.block .tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; flex: 0 0 26px;
+              color: var(--ink-3); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .block.h1 .tag, .block.h2 .tag, .block.h3 .tag { color: var(--accent); }
 .block .txt { flex: 1 1 auto; min-width: 0; font-size: 13.5px; word-break: break-word; }
-.block.h1 .txt { font-weight: 640; font-size: 15px; }
+.block.h1 .txt { font-weight: 650; font-size: 15px; }
 .block.h2 .txt { font-weight: 620; }
-.block.h3 .txt { font-weight: 600; }
-.block.p .txt { color: var(--ink-muted); }
-.block .ln { flex: 0 0 auto; font-size: 11px; color: var(--ink-faint);
+.block.h3 .txt { font-weight: 580; }
+.block.p .txt { color: var(--ink-2); }
+.block .ln { flex: 0 0 auto; font-size: 11px; color: var(--ink-3);
              font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-/* --- inventory: structure outline --- */
-.tree { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-        padding: 14px 16px; overflow-x: auto;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12.5px; line-height: 1.75; }
+/* structure tree */
+.tree { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+        padding: 15px 17px; overflow-x: auto; font-size: 12.5px; line-height: 1.75;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .tree div { white-space: pre; }
 .tree .t { color: var(--accent); }
-.tree .q { color: var(--ink-muted); }
-.tree .n { color: var(--ink-faint); }
+.tree .q { color: var(--ink-2); }
+.tree .n { color: var(--ink-3); }
 
-/* --- inventory: tables --- */
-table.grid { width: 100%; border-collapse: collapse; background: var(--card);
-             border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
-             font-size: 13px; }
-table.grid th { text-align: left; font-size: 11px; text-transform: uppercase;
-                letter-spacing: .06em; color: var(--ink-faint); font-weight: 600;
-                padding: 9px 14px; border-bottom: 1px solid var(--border); }
-table.grid td { padding: 9px 14px; border-bottom: 1px solid var(--border);
-                vertical-align: top; word-break: break-all; }
+/* tables */
+.scroll-x { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--border); }
+table.grid { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 13px; }
+table.grid th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+                color: var(--ink-3); font-weight: 660; padding: 10px 15px;
+                border-bottom: 1px solid var(--border); background: var(--surface-2);
+                white-space: nowrap; }
+table.grid td { padding: 10px 15px; border-bottom: 1px solid var(--border); vertical-align: top;
+                word-break: break-all; }
 table.grid tr:last-child td { border-bottom: none; }
-table.grid td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                     font-size: 12px; }
-.state { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-         padding: 2px 7px; border-radius: 4px; white-space: nowrap; color: #fff; }
+table.grid td.mono { font-size: 12px; }
+.state { display: inline-block; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+         letter-spacing: .05em; padding: 3px 8px; border-radius: 5px; white-space: nowrap; color: #fff; }
 .state.missing { background: var(--high); }
 .state.empty { background: var(--medium); }
-@media (prefers-color-scheme: dark) { .state { color: #0c111d; } }
-.scroll-x { overflow-x: auto; }
+@media (prefers-color-scheme: dark) { .state { color: #0b0f0e; } }
 
-/* --- inventory: schema --- */
-pre.code { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-           padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
-           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+pre.code { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+           padding: 15px 17px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
            color: var(--ink); margin: 0; }
-.notes { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: var(--ink-muted); }
-.notes li { margin-bottom: 4px; }
-.typerow { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
+.notes { margin: 0 0 15px; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
+.notes li { margin-bottom: 5px; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 15px; }
+.chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 5px 12px; border-radius: 999px;
+        border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; color: var(--ink-2); }
+.chip b { font-size: 13px; font-weight: 660; color: var(--ink); }
 
-footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
-         font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
-footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+footer.foot { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border);
+              font-size: 12px; color: var(--ink-3); line-height: 1.75; max-width: 90ch; }
 
-@media (max-width: 600px) {
-  body { padding: 20px 14px 48px; }
-  .head { padding: 20px; gap: 20px; }
-  .ring { width: 104px; height: 104px; }
-  .ring-num { font-size: 26px; }
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0,1fr); }
+  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: nowrap;
+             overflow-x: auto; align-items: center; gap: 4px; padding: 11px 13px;
+             border-right: none; border-bottom: 1px solid var(--border); }
+  .brand, .navgroup, .sidefoot { display: none; }
+  .navitem { flex: 0 0 auto; padding: 8px 12px; }
+  .navitem .navlabel { max-width: none; }
+  .topbar, .content { padding-left: 18px; padding-right: 18px; }
 }
 
 @media print {
-  body { background: #fff; padding: 0; }
-  .finding, .pack-card, .head { box-shadow: none; break-inside: avoid; }
+  .sidebar, .topbar-side { display: none; }
+  .app { display: block; }
+  .panel { display: block !important; }
+  .card, .stat, .finding { box-shadow: none; break-inside: avoid; }
+  body { background: #fff; }
 }
 
-#tab-seo:checked ~ .panels > #panel-seo { display: block; }
-#tab-seo:checked ~ .tablist label[for="tab-seo"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-seo:focus-visible ~ .tablist label[for="tab-seo"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-headings:checked ~ .panels > #panel-headings { display: block; }
-#tab-headings:checked ~ .tablist label[for="tab-headings"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-headings:focus-visible ~ .tablist label[for="tab-headings"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-meta:checked ~ .panels > #panel-meta { display: block; }
-#tab-meta:checked ~ .tablist label[for="tab-meta"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-meta:focus-visible ~ .tablist label[for="tab-meta"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-canonical:checked ~ .panels > #panel-canonical { display: block; }
-#tab-canonical:checked ~ .tablist label[for="tab-canonical"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-canonical:focus-visible ~ .tablist label[for="tab-canonical"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-alt:checked ~ .panels > #panel-alt { display: block; }
-#tab-alt:checked ~ .tablist label[for="tab-alt"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-alt:focus-visible ~ .tablist label[for="tab-alt"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-imgsize:checked ~ .panels > #panel-imgsize { display: block; }
-#tab-imgsize:checked ~ .tablist label[for="tab-imgsize"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-imgsize:focus-visible ~ .tablist label[for="tab-imgsize"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-robots:checked ~ .panels > #panel-robots { display: block; }
-#tab-robots:checked ~ .tablist label[for="tab-robots"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-robots:focus-visible ~ .tablist label[for="tab-robots"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-schema:checked ~ .panels > #panel-schema { display: block; }
-#tab-schema:checked ~ .tablist label[for="tab-schema"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-schema:focus-visible ~ .tablist label[for="tab-schema"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-images:checked ~ .panels > #panel-images { display: block; }
-#tab-images:checked ~ .tablist label[for="tab-images"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-images:focus-visible ~ .tablist label[for="tab-images"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-#tab-structure:checked ~ .panels > #panel-structure { display: block; }
-#tab-structure:checked ~ .tablist label[for="tab-structure"] { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
-#tab-structure:focus-visible ~ .tablist label[for="tab-structure"] { outline: 2px solid var(--accent); outline-offset: -2px; }
-@media print { .panel { display: block !important; } .tablist { display: none; } }</style>
+.pagetitle { display: none; }
+#tab-overview:checked ~ .main .panels > #panel-overview { display: block; }
+#tab-overview:checked ~ .sidebar label[for="tab-overview"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-overview:checked ~ .main .topbar div[data-title="overview"] { display: block; }
+#tab-overview:focus-visible ~ .sidebar label[for="tab-overview"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-seo:checked ~ .main .panels > #panel-seo { display: block; }
+#tab-seo:checked ~ .sidebar label[for="tab-seo"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-seo:checked ~ .main .topbar div[data-title="seo"] { display: block; }
+#tab-seo:focus-visible ~ .sidebar label[for="tab-seo"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-headings:checked ~ .main .panels > #panel-headings { display: block; }
+#tab-headings:checked ~ .sidebar label[for="tab-headings"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-headings:checked ~ .main .topbar div[data-title="headings"] { display: block; }
+#tab-headings:focus-visible ~ .sidebar label[for="tab-headings"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-meta:checked ~ .main .panels > #panel-meta { display: block; }
+#tab-meta:checked ~ .sidebar label[for="tab-meta"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-meta:checked ~ .main .topbar div[data-title="meta"] { display: block; }
+#tab-meta:focus-visible ~ .sidebar label[for="tab-meta"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-canonical:checked ~ .main .panels > #panel-canonical { display: block; }
+#tab-canonical:checked ~ .sidebar label[for="tab-canonical"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-canonical:checked ~ .main .topbar div[data-title="canonical"] { display: block; }
+#tab-canonical:focus-visible ~ .sidebar label[for="tab-canonical"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-alt:checked ~ .main .panels > #panel-alt { display: block; }
+#tab-alt:checked ~ .sidebar label[for="tab-alt"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-alt:checked ~ .main .topbar div[data-title="alt"] { display: block; }
+#tab-alt:focus-visible ~ .sidebar label[for="tab-alt"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-imgsize:checked ~ .main .panels > #panel-imgsize { display: block; }
+#tab-imgsize:checked ~ .sidebar label[for="tab-imgsize"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-imgsize:checked ~ .main .topbar div[data-title="imgsize"] { display: block; }
+#tab-imgsize:focus-visible ~ .sidebar label[for="tab-imgsize"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-robots:checked ~ .main .panels > #panel-robots { display: block; }
+#tab-robots:checked ~ .sidebar label[for="tab-robots"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-robots:checked ~ .main .topbar div[data-title="robots"] { display: block; }
+#tab-robots:focus-visible ~ .sidebar label[for="tab-robots"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-schema:checked ~ .main .panels > #panel-schema { display: block; }
+#tab-schema:checked ~ .sidebar label[for="tab-schema"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-schema:checked ~ .main .topbar div[data-title="schema"] { display: block; }
+#tab-schema:focus-visible ~ .sidebar label[for="tab-schema"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-images:checked ~ .main .panels > #panel-images { display: block; }
+#tab-images:checked ~ .sidebar label[for="tab-images"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-images:checked ~ .main .topbar div[data-title="images"] { display: block; }
+#tab-images:focus-visible ~ .sidebar label[for="tab-images"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+#tab-structure:checked ~ .main .panels > #panel-structure { display: block; }
+#tab-structure:checked ~ .sidebar label[for="tab-structure"] { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+#tab-structure:checked ~ .main .topbar div[data-title="structure"] { display: block; }
+#tab-structure:focus-visible ~ .sidebar label[for="tab-structure"] { outline: 2px solid var(--accent); outline-offset: -2px; }</style>
 </head>
 <body>
-<div class="wrap">
+<div class="app" role="radiogroup" aria-label="Report sections">
+  <input type="radio" name="qa-nav" id="tab-overview" checked>
+  <input type="radio" name="qa-nav" id="tab-seo">
+  <input type="radio" name="qa-nav" id="tab-headings">
+  <input type="radio" name="qa-nav" id="tab-meta">
+  <input type="radio" name="qa-nav" id="tab-canonical">
+  <input type="radio" name="qa-nav" id="tab-alt">
+  <input type="radio" name="qa-nav" id="tab-imgsize">
+  <input type="radio" name="qa-nav" id="tab-robots">
+  <input type="radio" name="qa-nav" id="tab-schema">
+  <input type="radio" name="qa-nav" id="tab-images">
+  <input type="radio" name="qa-nav" id="tab-structure">
 
-<header class="head">
-  <div class="head-main">
-    <p class="eyebrow">Website QA Audit</p>
-    <h1>Home</h1>
-    <p class="url"><a href="https://northgate-studio.test/">https://northgate-studio.test/</a></p>
-    <ul class="facts">
-      <li><b>HTTP 200</b></li>
-      <li><b>142</b> ms</li>
-      <li><b>2.0</b> KB</li>
-      <li><b>21</b> findings</li>
-      <li>Scanned <b>2026-07-31T18:28:15+00:00</b></li>
-    </ul>
-  </div>
-  <div class="ring">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"><svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M10 16.5l4 4 8-8.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><span class="brand-name">Website QA</span><br>
+      <span class="brand-sub">Audit report</span></span>
+    </div>
+    <p class="navgroup">Overview</p>
+    <label class="navitem" for="tab-overview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v4h-7zM14 10h7v11h-7zM3 13h7v8H3z"/></svg><span class="navlabel">Dashboard</span></label>
+    <p class="navgroup">Audit</p>
+    <label class="navitem" for="tab-seo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4"/></svg><span class="navlabel">SEO</span><span class="pill hot">11</span></label>
+    <label class="navitem" for="tab-headings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M18 4v16M6 12h12"/></svg><span class="navlabel">Headings</span><span class="pill">7</span></label>
+    <label class="navitem" for="tab-meta"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z M7.5 7.5h.01"/></svg><span class="navlabel">Meta Tags</span><span class="pill">1</span></label>
+    <label class="navitem" for="tab-canonical"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg><span class="navlabel">Canonical URLs</span><span class="pill hot">check</span></label>
+    <label class="navitem" for="tab-alt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6"/></svg><span class="navlabel">Alt Tag Missing</span><span class="pill hot">3</span></label>
+    <label class="navitem" for="tab-imgsize"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3h6a3 3 0 0 0-3-3zM5 6h14l2 15H3z"/></svg><span class="navlabel">Image Size</span><span class="pill">off</span></label>
+    <label class="navitem" for="tab-robots"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg><span class="navlabel">Index / Follow</span><span class="pill">ok</span></label>
+    <label class="navitem" for="tab-schema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg><span class="navlabel">Schema</span><span class="pill">2</span></label>
+    <p class="navgroup">More detail</p>
+    <label class="navitem" for="tab-images"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17h.01"/></svg><span class="navlabel">Image Issues</span><span class="pill hot">10</span></label>
+    <label class="navitem" for="tab-structure"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5zM3 14l9 5 9-5"/></svg><span class="navlabel">Page Structure</span><span class="pill">27</span></label>
+    <div class="sidefoot"><div class="sidecard"><h4>Run it yourself</h4><p>Dependency-free. No install, no database.</p><code>python -m audit --serve</code></div></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-main">
+        <p class="crumb">Website QA Audit</p>
+        <div data-title="overview" class="pagetitle"><h1>Dashboard</h1></div>
+        <div data-title="seo" class="pagetitle"><h1>SEO</h1></div>
+        <div data-title="headings" class="pagetitle"><h1>Headings</h1></div>
+        <div data-title="meta" class="pagetitle"><h1>Meta Tags</h1></div>
+        <div data-title="canonical" class="pagetitle"><h1>Canonical URLs</h1></div>
+        <div data-title="alt" class="pagetitle"><h1>Alt Tag Missing</h1></div>
+        <div data-title="imgsize" class="pagetitle"><h1>Image Size</h1></div>
+        <div data-title="robots" class="pagetitle"><h1>Index / Follow</h1></div>
+        <div data-title="schema" class="pagetitle"><h1>Schema</h1></div>
+        <div data-title="images" class="pagetitle"><h1>Image Issues</h1></div>
+        <div data-title="structure" class="pagetitle"><h1>Page Structure</h1></div>
+        <p class="sub"><a href="https://northgate-studio.test/">https://northgate-studio.test/</a>
+        &nbsp;&middot;&nbsp; Home</p>
+      </div>
+      <div class="topbar-side"></div>
+    </header>
+
+    <div class="content">
+      <div class="panels">
+        <div class="panel" id="panel-overview">
+<section><div class="grid-4"><div class="stat accent"><span class="corner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 1 9-9M12 12l5-3"/></svg></span><p class="k">Overall score</p><p class="v">45</p><p class="d"><span class="tone">2 categories</span></p></div><div class="stat"><span class="corner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3zM12 10v4M12 17h.01"/></svg></span><p class="k">Findings</p><p class="v">21</p><p class="d"><span class="tone">4 need attention</span></p></div><div class="stat"><span class="corner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6"/></svg></span><p class="k">Images</p><p class="v">7</p><p class="d"><span class="tone">3 missing alt</span></p></div><div class="stat"><span class="corner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3h6a3 3 0 0 0-3-3zM5 6h14l2 15H3z"/></svg></span><p class="k">Page weight</p><p class="v">2 KB</p><p class="d">HTML document only</p></div></div><div class="grid-2"><div class="card card-pad"><div class="card-head"><h3 class="card-title">Category scores</h3><p class="card-note">100 minus weighted deductions</p></div><div class="meters"><div class="meter-row"><div class="mt"><span>SEO</span><b style="color:var(--bad)">44<span style="color:var(--ink-3);font-weight:500"> &middot; 11 issues</span></b></div><div class="meter"><i style="width:44.0%;background:var(--bad)"></i></div></div><div class="meter-row"><div class="mt"><span>Images</span><b style="color:var(--bad)">46<span style="color:var(--ink-3);font-weight:500"> &middot; 10 issues</span></b></div><div class="meter"><i style="width:46.0%;background:var(--bad)"></i></div></div></div></div><div class="card card-pad"><div class="card-head"><h3 class="card-title">Overall</h3></div><div class="ring">
   <svg width="128" height="128" viewBox="0 0 100 100" aria-hidden="true">
     <circle class="ring-track" cx="50" cy="50" r="42" fill="none" stroke-width="8"/>
     <circle class="ring-val" cx="50" cy="50" r="42" fill="none" stroke-width="8"
@@ -313,55 +473,9 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     <div class="ring-num">45</div>
     <div class="ring-of">of 100</div>
   </div>
-</div>
-</header>
-
-<div class="chips">
-  <span class="chip high"><b>4</b> High</span> <span class="chip medium"><b>8</b> Medium</span> <span class="chip low"><b>7</b> Low</span> <span class="chip info"><b>2</b> Info</span>
-</div>
-
-<div class="packs">
-<div class="pack-card">
-  <div class="name">SEO</div>
-  <div class="val" style="color:var(--bad)">44</div>
-  <div class="meter"><span style="width:44.0%;
-       background:var(--bad)"></span></div>
-  <div class="sub">11 issues</div>
-</div>
-<div class="pack-card">
-  <div class="name">Images</div>
-  <div class="val" style="color:var(--bad)">46</div>
-  <div class="meter"><span style="width:46.0%;
-       background:var(--bad)"></span></div>
-  <div class="sub">10 issues</div>
-</div>
-</div>
-
-<div class="tabs" role="radiogroup" aria-label="Report sections">
-  <input type="radio" name="qa-tabs" id="tab-seo" checked>
-  <input type="radio" name="qa-tabs" id="tab-headings">
-  <input type="radio" name="qa-tabs" id="tab-meta">
-  <input type="radio" name="qa-tabs" id="tab-canonical">
-  <input type="radio" name="qa-tabs" id="tab-alt">
-  <input type="radio" name="qa-tabs" id="tab-imgsize">
-  <input type="radio" name="qa-tabs" id="tab-robots">
-  <input type="radio" name="qa-tabs" id="tab-schema">
-  <input type="radio" name="qa-tabs" id="tab-images">
-  <input type="radio" name="qa-tabs" id="tab-structure">
-  <div class="tablist">
-    <label for="tab-seo" class="warn">SEO<span class="badge-n">11</span></label>
-    <label for="tab-headings">Headings<span class="badge-n">7</span></label>
-    <label for="tab-meta">Meta Tags<span class="badge-n">1</span></label>
-    <label for="tab-canonical" class="warn">Canonical<span class="badge-n">check</span></label>
-    <label for="tab-alt" class="warn">Alt Missing<span class="badge-n">3</span></label>
-    <label for="tab-imgsize">Image Size<span class="badge-n">off</span></label>
-    <label for="tab-robots">Index / Follow<span class="badge-n">ok</span></label>
-    <label for="tab-schema">Schema<span class="badge-n">2</span></label>
-    <label for="tab-images" class="warn">Image Issues<span class="badge-n">10</span></label>
-    <label for="tab-structure">Structure<span class="badge-n">27</span></label>
-  </div>
-  <div class="panels">
-    <div class="panel" id="panel-seo">
+</div><div class="legend" style="margin-top:20px"><div class="legend-row"><span class="legend-dot" style="background:var(--critical)"></span><span class="lbl">Critical</span><span class="num">0</span></div><div class="legend-row"><span class="legend-dot" style="background:var(--high)"></span><span class="lbl">High</span><span class="num">4</span></div><div class="legend-row"><span class="legend-dot" style="background:var(--medium)"></span><span class="lbl">Medium</span><span class="num">8</span></div><div class="legend-row"><span class="legend-dot" style="background:var(--low)"></span><span class="lbl">Low</span><span class="num">7</span></div><div class="legend-row"><span class="legend-dot" style="background:var(--info)"></span><span class="lbl">Info</span><span class="num">2</span></div></div></div></div><div class="grid-2"><div class="card card-pad"><div class="card-head"><h3 class="card-title">Response</h3></div><ul class="factlist"><li><span class="fk">Status</span><span class="fv">HTTP 200</span></li><li><span class="fk">Response time</span><span class="fv">142 ms</span></li><li><span class="fk">Document size</span><span class="fv">2.0 KB</span></li><li><span class="fk">Scanned</span><span class="fv">2026-08-04 05:45:53 UTC</span></li><li><span class="fk">Indexable</span><span class="fv">index, follow</span></li><li><span class="fk">Canonical</span><span class="fv">missing</span></li></ul></div><div class="card card-pad"><div class="card-head"><h3 class="card-title">Scope of this run</h3></div><p class="card-note">Analysis is of the <b>served HTML</b>. Lighthouse performance metrics, axe-core accessibility rules, JavaScript-rendered content, and visual review require the browser-based modules and are not included.</p></div></div></section>
+        </div>
+        <div class="panel" id="panel-seo">
 <section>
   <h2>SEO <span class="count-pill">11 findings</span><span class="count-pill">44/100</span></h2>
   <ul class="stats">
@@ -475,8 +589,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   <p class="f-fix"><b>Fix:</b> Add &lt;meta name=&quot;twitter:card&quot; content=&quot;summary_large_image&quot;&gt; to control the shared preview.</p>
 </article>
 </section>
-    </div>
-    <div class="panel" id="panel-headings">
+        </div>
+        <div class="panel" id="panel-headings">
 <section>
   <h2>Headings <span class="count-pill">7 total</span></h2>
   <p class="section-note">Every H1&ndash;H6 in document order, indented by level. 2 &lt;h1&gt; · 1 &lt;h2&gt; · 1 &lt;h3&gt; · 3 &lt;h4&gt;</p>
@@ -490,8 +604,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     <div class="block h2"><span class="tag">h2</span><span class="txt" style="padding-left:18px">Ready to start?</span><span class="ln">L54</span></div>
   </div>
 </section>
-    </div>
-    <div class="panel" id="panel-meta">
+        </div>
+        <div class="panel" id="panel-meta">
 <section>
   <h2>Meta tags <span class="count-pill">1 tags</span></h2>
   <p class="section-note">Every <code>&lt;meta&gt;</code> element as served, in document order.</p>
@@ -500,8 +614,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     <tr><td>charset</td><td class="mono">charset</td><td>utf-8</td></tr>
     </table></div>
 </section>
-    </div>
-    <div class="panel" id="panel-canonical">
+        </div>
+        <div class="panel" id="panel-canonical">
 <section>
   <h2>Canonical URL <span class="count-pill">missing</span></h2>
   <p class="section-note">The canonical tells search engines which URL to index when the same content is reachable by more than one address.</p>
@@ -518,8 +632,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 </article>
   </div>
 </section>
-    </div>
-    <div class="panel" id="panel-alt">
+        </div>
+        <div class="panel" id="panel-alt">
 <section>
   <h2>Image alt text <span class="count-pill">7 images</span><span class="count-pill">57% described</span></h2>
   <p class="section-note">Source URLs for every image with no alt attribute or an explicitly empty one. <code>alt=""</code> is correct for purely decorative images — confirm each one genuinely carries no meaning.</p>
@@ -530,15 +644,15 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     <tr><td><span class="state empty">empty</span></td><td class="mono">https://northgate-studio.test/assets/logo-footer.png</td><td>64</td><td>—</td></tr>
     </table></div>
 </section>
-    </div>
-    <div class="panel" id="panel-imgsize">
+        </div>
+        <div class="panel" id="panel-imgsize">
 <section>
   <h2>Image size <span class="count-pill">not checked</span></h2>
   <p class="section-note">Measuring image weight needs one request per image, so it is off by default.</p>
   <div class="f-el">Enable it with <b>--check-images</b> on the command line, or tick <b>"Check image sizes"</b> in the web UI. Images over 2.50 MB will be listed here.</div>
 </section>
-    </div>
-    <div class="panel" id="panel-robots">
+        </div>
+        <div class="panel" id="panel-robots">
 <section>
   <h2>Index / Follow <span class="count-pill">index, follow</span></h2>
   <p class="section-note">Crawler directives from both the markup and the HTTP response. A header-level <code>X-Robots-Tag</code> is invisible in the HTML and is a classic cause of "the page looks fine but will not rank".</p>
@@ -551,8 +665,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     </table></div>
   <p class="f-fix"><b>Default:</b> nothing on the page restricts crawling, so it is treated as index, follow. No robots meta tag is needed to achieve that.</p>
 </section>
-    </div>
-    <div class="panel" id="panel-schema">
+        </div>
+        <div class="panel" id="panel-schema">
 <section>
   <h2>Suggested schema.org markup <span class="count-pill">2 types</span></h2>
   <p class="section-note">Generated from what is actually on the page — no placeholder values. Review before publishing; inaccurate structured data is worse than none.</p>
@@ -591,8 +705,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 }
 &lt;/script&gt;</pre>
 </section>
-    </div>
-    <div class="panel" id="panel-images">
+        </div>
+        <div class="panel" id="panel-images">
 <section>
   <h2>Images <span class="count-pill">10 findings</span><span class="count-pill">46/100</span></h2>
   <ul class="stats">
@@ -701,8 +815,8 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   <p class="f-fix"><b>Fix:</b> alt=&quot;&quot; is correct for decorative images and screen readers will skip them. Confirm none of these actually carry meaning.</p>
 </article>
 </section>
-    </div>
-    <div class="panel" id="panel-structure">
+        </div>
+        <div class="panel" id="panel-structure">
 <section>
   <h2>Page structure <span class="count-pill">27 elements</span><span class="count-pill">depth 4</span></h2>
   <p class="section-note">Structural elements only — inline formatting is omitted so the page shape stays legible.</p>
@@ -736,22 +850,19 @@ footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     <div>      <span class="t">p</span><span class="q"></span></div>
   </div>
 </section>
+        </div>
+      </div>
+
+      <footer class="foot">
+        Generated by <code>python -m audit</code> from the <b>AI Website QA Platform</b>
+        &mdash; a dependency-free static HTML audit engine (Python standard library only,
+        no third-party packages).<br>
+        Analysis is of the <b>served HTML</b>. Lighthouse performance metrics, axe-core
+        accessibility rules, JavaScript-rendered content, and visual review require the
+        browser-based modules and are <b>not</b> part of this report.
+      </footer>
     </div>
   </div>
-</div>
-
-<footer>
-  Generated by <code>python -m audit</code> from the
-  <b>AI Website QA Platform</b> &mdash; a dependency-free static HTML audit engine
-  (Python standard library only, no third-party packages).<br>
-  Scope of this run: SEO metadata, heading structure, image accessibility and optimisation
-  hints, and&mdash;when enabled&mdash;link reachability, plus a content listing, structure
-  outline, image alt inventory, and generated schema.org markup. Analysis is of the
-  <b>served HTML</b>: Lighthouse performance metrics, axe-core accessibility rules,
-  JavaScript-rendered content, and visual/design review require the browser-based modules
-  and are <b>not</b> part of this report.
-</footer>
-
 </div>
 </body>
 </html>

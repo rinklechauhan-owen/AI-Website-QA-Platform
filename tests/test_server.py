@@ -81,15 +81,18 @@ class TestServerRoutes(unittest.TestCase):
         except urllib.error.HTTPError as exc:
             return exc.code, exc.read().decode("utf-8", "replace")
 
-    def _post(self, data):
+    def _post_to(self, path, data):
         request = urllib.request.Request(
-            self.base + "/audit", data=urllib.parse.urlencode(data).encode(), method="POST"
+            self.base + path, data=urllib.parse.urlencode(data).encode(), method="POST"
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as resp:
                 return resp.status, resp.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             return exc.code, exc.read().decode("utf-8", "replace")
+
+    def _post(self, data):
+        return self._post_to("/audit", data)
 
     def test_form_is_served(self):
         status, body = self._get("/")
@@ -131,6 +134,7 @@ class TestServerRoutes(unittest.TestCase):
             status, body = self._post({"url": "example.com"})
         self.assertEqual(status, 200)
         for tab_id in (
+            "panel-overview",
             "panel-seo",
             "panel-headings",
             "panel-meta",
@@ -149,8 +153,8 @@ class TestServerRoutes(unittest.TestCase):
         """Radio + :checked, so a saved report still switches tabs offline."""
         with mock.patch.object(server, "audit_url", _stub_audit):
             _, body = self._post({"url": "example.com"})
-        self.assertIn('type="radio" name="qa-tabs"', body)
-        self.assertIn("#tab-seo:checked ~ .panels > #panel-seo", body)
+        self.assertIn('type="radio" name="qa-nav"', body)
+        self.assertIn("#tab-seo:checked ~ .main .panels > #panel-seo", body)
         self.assertNotIn("<script", body.lower())
 
     def test_served_report_contains_no_live_script(self):
@@ -168,6 +172,56 @@ class TestServerRoutes(unittest.TestCase):
             status, body = self._get("/?url=example.com")
         self.assertEqual(status, 200)
         self.assertIn('id="panel-headings"', body)
+
+    def test_schema_generator_page_is_served(self):
+        status, body = self._get("/schema")
+        self.assertEqual(status, 200)
+        self.assertIn('name="content"', body)
+        self.assertIn('name="schema_type"', body)
+
+    def test_schema_generator_returns_markup_for_pasted_content(self):
+        status, body = self._post_to(
+            "/schema",
+            {"content": "Is it fast?\nYes.\nIs it free?\nYes.", "schema_type": "auto"},
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("FAQPage", body)
+        self.assertIn("Is it fast?", body)
+
+    def test_schema_generator_escapes_its_own_output(self):
+        status, body = self._post_to(
+            "/schema", {"content": "Name: Acme\nPrice: 10", "schema_type": "Product"}
+        )
+        self.assertEqual(status, 200)
+        self.assertNotIn("<script", body.lower())
+        self.assertIn("&lt;script type=&quot;application/ld+json&quot;&gt;", body)
+
+    def test_schema_generator_reports_unusable_input(self):
+        status, body = self._post_to(
+            "/schema", {"content": "nothing useful here", "schema_type": "Event"}
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("Nothing generated", body)
+
+    def test_schema_generator_rejects_an_unknown_type_by_falling_back(self):
+        status, _ = self._post_to(
+            "/schema", {"content": "Name: Acme\nPrice: 10", "schema_type": "Nonsense"}
+        )
+        self.assertEqual(status, 200)
+
+    def test_hostile_paste_cannot_inject_script(self):
+        status, body = self._post_to(
+            "/schema",
+            {"content": "Name: </script><script>alert(1)</script>\nPrice: 1",
+             "schema_type": "Product"},
+        )
+        self.assertEqual(status, 200)
+        self.assertNotIn("<script>alert", body)
+
+    def test_sidebar_links_appear_only_when_serving(self):
+        with mock.patch.object(server, "audit_url", _stub_audit):
+            _, body = self._post({"url": "example.com"})
+        self.assertIn('href="/schema"', body)
 
     def test_csp_header_blocks_scripts(self):
         with urllib.request.urlopen(self.base + "/", timeout=10) as resp:

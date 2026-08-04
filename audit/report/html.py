@@ -7,9 +7,11 @@ emailed, committed, or opened straight off disk and still render identically.
 from __future__ import annotations
 
 from html import escape
-from typing import Dict, List, Tuple
+from dataclasses import dataclass
+from typing import Dict, List
 
 from audit.assets import human_size
+from audit.report.theme import BASE_CSS, BRAND_MARK, icon
 from audit.engine import AuditResult, PackResult
 from audit.findings import Finding, Severity
 
@@ -24,255 +26,7 @@ SEVERITY_LABEL = {
     Severity.INFO: "Info",
 }
 
-_CSS = """
-* { box-sizing: border-box; }
-
-:root {
-  color-scheme: light dark;
-  --bg: #f7f8fa;
-  --card: #ffffff;
-  --border: #e4e7ec;
-  --ink: #101828;
-  --ink-muted: #667085;
-  --ink-faint: #98a2b3;
-  --accent: #2563eb;
-  --critical: #b42318;
-  --high: #d92d20;
-  --medium: #dc6803;
-  --low: #0e7490;
-  --info: #667085;
-  --good: #12b76a;
-  --warn: #f79009;
-  --bad: #f04438;
-  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c111d;
-    --card: #161b26;
-    --border: #262b37;
-    --ink: #f5f5f6;
-    --ink-muted: #94969c;
-    --ink-faint: #6c6f7a;
-    --accent: #60a5fa;
-    --critical: #fda29b;
-    --high: #f97066;
-    --medium: #fdb022;
-    --low: #67e8f9;
-    --info: #94969c;
-    --shadow: none;
-  }
-}
-
-body {
-  margin: 0;
-  padding: 40px 20px 72px;
-  background: var(--bg);
-  color: var(--ink);
-  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-.wrap { max-width: 940px; margin: 0 auto; }
-
-/* --- header --- */
-.head { display: flex; flex-wrap: wrap; gap: 28px; align-items: center;
-        background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-        padding: 28px; box-shadow: var(--shadow); }
-.head-main { flex: 1 1 380px; min-width: 0; }
-.eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
-           color: var(--ink-faint); font-weight: 600; margin: 0 0 8px; }
-h1 { font-size: 21px; line-height: 1.3; margin: 0 0 6px; font-weight: 650; word-break: break-word; }
-.url { margin: 0 0 14px; font-size: 13px; word-break: break-all; }
-.url a { color: var(--accent); text-decoration: none; }
-.url a:hover { text-decoration: underline; }
-.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; font-size: 12.5px;
-         color: var(--ink-muted); list-style: none; padding: 0; }
-.facts b { color: var(--ink); font-weight: 600; }
-
-/* --- score ring --- */
-.ring { position: relative; width: 128px; height: 128px; flex: 0 0 auto; }
-.ring svg { transform: rotate(-90deg); }
-.ring-track { stroke: var(--border); }
-.ring-val { stroke-linecap: round; }
-.ring-text { position: absolute; inset: 0; display: flex; flex-direction: column;
-             align-items: center; justify-content: center; }
-.ring-num { font-size: 31px; font-weight: 680; letter-spacing: -.02em; line-height: 1; }
-.ring-of { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase;
-           letter-spacing: .08em; margin-top: 5px; }
-
-/* --- severity chips --- */
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
-.chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 6px 13px;
-        border-radius: 999px; border: 1px solid var(--border); background: var(--card);
-        font-size: 12.5px; color: var(--ink-muted); }
-.chip b { font-size: 14px; font-weight: 660; }
-.chip.critical b { color: var(--critical); }
-.chip.high b { color: var(--high); }
-.chip.medium b { color: var(--medium); }
-.chip.low b { color: var(--low); }
-.chip.info b { color: var(--info); }
-
-/* --- pack summary cards --- */
-.packs { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-         gap: 12px; margin: 12px 0 0; }
-.pack-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-             padding: 16px 18px; box-shadow: var(--shadow); }
-.pack-card .name { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
-                   color: var(--ink-faint); font-weight: 600; }
-.pack-card .val { font-size: 26px; font-weight: 660; letter-spacing: -.02em; margin: 6px 0 10px; }
-.meter { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
-.meter span { display: block; height: 100%; border-radius: 999px; }
-.pack-card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 9px; }
-
-/* --- sections --- */
-section { margin-top: 40px; }
-h2 { font-size: 15.5px; font-weight: 650; margin: 0 0 4px;
-     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.count-pill { font-size: 11.5px; font-weight: 600; color: var(--ink-muted);
-              background: var(--bg); border: 1px solid var(--border);
-              padding: 2px 9px; border-radius: 999px; }
-.section-note { margin: 0 0 16px; font-size: 12.5px; color: var(--ink-muted); }
-
-/* --- stats --- */
-.stats { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }
-.stats li { font-size: 12px; color: var(--ink-muted); background: var(--card);
-            border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; }
-.stats b { color: var(--ink); font-weight: 620; }
-
-/* --- findings --- */
-.finding { background: var(--card); border: 1px solid var(--border);
-           border-left: 3px solid var(--border); border-radius: 10px;
-           padding: 16px 18px; margin-bottom: 10px; box-shadow: var(--shadow); }
-.finding.critical { border-left-color: var(--critical); }
-.finding.high     { border-left-color: var(--high); }
-.finding.medium   { border-left-color: var(--medium); }
-.finding.low      { border-left-color: var(--low); }
-.finding.info     { border-left-color: var(--info); }
-
-.f-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-         padding: 3px 8px; border-radius: 5px; flex: 0 0 auto; color: #fff; }
-.badge.critical { background: var(--critical); }
-.badge.high     { background: var(--high); }
-.badge.medium   { background: var(--medium); }
-.badge.low      { background: var(--low); }
-.badge.info     { background: var(--info); }
-@media (prefers-color-scheme: dark) { .badge { color: #0c111d; } }
-
-.f-title { font-weight: 600; font-size: 14.5px; flex: 1 1 260px; min-width: 0;
-           word-break: break-word; }
-.f-rule { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          font-size: 11.5px; color: var(--ink-faint); }
-.f-detail { margin: 9px 0 0; font-size: 13.5px; color: var(--ink-muted); word-break: break-word; }
-.f-el { margin: 10px 0 0; padding: 9px 11px; background: var(--bg); border: 1px solid var(--border);
-        border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px; color: var(--ink-muted); overflow-x: auto; white-space: pre-wrap;
-        word-break: break-all; }
-.f-fix { margin: 11px 0 0; padding-left: 12px; border-left: 2px solid var(--border);
-         font-size: 13.5px; }
-.f-fix b { font-weight: 620; }
-
-.clean { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-         padding: 18px; font-size: 13.5px; color: var(--ink-muted); }
-.clean b { color: var(--good); }
-
-/* --- tabs (radio + :checked, so the report needs no JavaScript) --- */
-.tabs { margin-top: 34px; }
-/* Visually hidden but still focusable and exposed to assistive technology. Zero width and
-   height, or display:none, would drop the radios out of the accessibility tree and leave the
-   tabs keyboard-unreachable. */
-.tabs > input[type=radio] { position: absolute; width: 1px; height: 1px; margin: -1px;
-                            padding: 0; overflow: hidden; white-space: nowrap;
-                            clip: rect(0 0 0 0); clip-path: inset(50%); border: 0; }
-.tablist { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--border);
-           margin-bottom: 26px; scrollbar-width: thin; }
-.tablist label { flex: 0 0 auto; padding: 10px 15px; cursor: pointer; font-size: 13.5px;
-                 font-weight: 550; color: var(--ink-muted); white-space: nowrap;
-                 border-bottom: 2px solid transparent; margin-bottom: -1px;
-                 border-radius: 7px 7px 0 0; user-select: none; }
-.tablist label:hover { color: var(--ink); background: var(--card); }
-.tablist .badge-n { display: inline-block; margin-left: 7px; padding: 1px 7px;
-                    border-radius: 999px; font-size: 11px; font-weight: 650;
-                    background: var(--bg); border: 1px solid var(--border);
-                    color: var(--ink-muted); }
-.tablist label.warn .badge-n { background: var(--high); border-color: var(--high); color: #fff; }
-@media (prefers-color-scheme: dark) { .tablist label.warn .badge-n { color: #0c111d; } }
-.panel { display: none; }
-.panel > section:first-child { margin-top: 0; }
-
-/* --- inventory: content listing --- */
-.blocks { display: flex; flex-direction: column; gap: 1px; background: var(--border);
-          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.block { display: flex; gap: 12px; padding: 10px 14px; background: var(--card);
-         align-items: baseline; }
-.block .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-              font-size: 11px; font-weight: 700; text-transform: uppercase; flex: 0 0 34px;
-              color: var(--ink-faint); }
-.block.h1 .tag, .block.h2 .tag, .block.h3 .tag { color: var(--accent); }
-.block .txt { flex: 1 1 auto; min-width: 0; font-size: 13.5px; word-break: break-word; }
-.block.h1 .txt { font-weight: 640; font-size: 15px; }
-.block.h2 .txt { font-weight: 620; }
-.block.h3 .txt { font-weight: 600; }
-.block.p .txt { color: var(--ink-muted); }
-.block .ln { flex: 0 0 auto; font-size: 11px; color: var(--ink-faint);
-             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
-/* --- inventory: structure outline --- */
-.tree { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-        padding: 14px 16px; overflow-x: auto;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12.5px; line-height: 1.75; }
-.tree div { white-space: pre; }
-.tree .t { color: var(--accent); }
-.tree .q { color: var(--ink-muted); }
-.tree .n { color: var(--ink-faint); }
-
-/* --- inventory: tables --- */
-table.grid { width: 100%; border-collapse: collapse; background: var(--card);
-             border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
-             font-size: 13px; }
-table.grid th { text-align: left; font-size: 11px; text-transform: uppercase;
-                letter-spacing: .06em; color: var(--ink-faint); font-weight: 600;
-                padding: 9px 14px; border-bottom: 1px solid var(--border); }
-table.grid td { padding: 9px 14px; border-bottom: 1px solid var(--border);
-                vertical-align: top; word-break: break-all; }
-table.grid tr:last-child td { border-bottom: none; }
-table.grid td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                     font-size: 12px; }
-.state { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-         padding: 2px 7px; border-radius: 4px; white-space: nowrap; color: #fff; }
-.state.missing { background: var(--high); }
-.state.empty { background: var(--medium); }
-@media (prefers-color-scheme: dark) { .state { color: #0c111d; } }
-.scroll-x { overflow-x: auto; }
-
-/* --- inventory: schema --- */
-pre.code { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-           padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
-           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-           color: var(--ink); margin: 0; }
-.notes { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: var(--ink-muted); }
-.notes li { margin-bottom: 4px; }
-.typerow { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
-
-footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
-         font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
-footer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
-@media (max-width: 600px) {
-  body { padding: 20px 14px 48px; }
-  .head { padding: 20px; gap: 20px; }
-  .ring { width: 104px; height: 104px; }
-  .ring-num { font-size: 26px; }
-}
-
-@media print {
-  body { background: #fff; padding: 0; }
-  .finding, .pack-card, .head { box-shadow: none; break-inside: avoid; }
-}
-"""
+_CSS = BASE_CSS
 
 
 def _score_color(score: float) -> str:
@@ -607,54 +361,6 @@ def _image_size_section(report) -> str:
     return "\n".join(parts)
 
 
-def _tab_css(keys: List[str]) -> str:
-    """Per-tab :checked rules. Generated because the tab set varies by run."""
-    rules = []
-    for key in keys:
-        rules.append(
-            f"#tab-{key}:checked ~ .panels > #panel-{key} {{ display: block; }}\n"
-            f'#tab-{key}:checked ~ .tablist label[for="tab-{key}"] '
-            "{ color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }\n"
-            # Keyboard users need to see which tab has focus, not just which is selected.
-            f'#tab-{key}:focus-visible ~ .tablist label[for="tab-{key}"] '
-            "{ outline: 2px solid var(--accent); outline-offset: -2px; }"
-        )
-    # Printing has no interaction, so every panel is shown.
-    rules.append("@media print { .panel { display: block !important; } .tablist { display: none; } }")
-    return "\n".join(rules)
-
-
-def _render_tabs(tabs: List[Tuple[str, str, str, bool, str]]) -> str:
-    """tabs: (key, label, badge, warn, body). The first tab is selected."""
-    # A native radio group rather than the ARIA tabs pattern: aria-selected would have to be
-    # kept in step by script, and this report deliberately ships none. Arrow keys move between
-    # radios for free, and each label supplies its radio's accessible name.
-    parts = ['<div class="tabs" role="radiogroup" aria-label="Report sections">']
-
-    for index, (key, _, _, _, _) in enumerate(tabs):
-        checked = " checked" if index == 0 else ""
-        parts.append(
-            f'  <input type="radio" name="qa-tabs" id="tab-{key}"{checked}>'
-        )
-
-    parts.append('  <div class="tablist">')
-    for key, label, badge, warn, _ in tabs:
-        chip = f'<span class="badge-n">{escape(badge)}</span>' if badge else ""
-        classes = ' class="warn"' if warn else ""
-        parts.append(f'    <label for="tab-{key}"{classes}>{escape(label)}{chip}</label>')
-    parts.append("  </div>")
-
-    parts.append('  <div class="panels">')
-    for key, _, _, _, body in tabs:
-        parts.append(f'    <div class="panel" id="panel-{key}">')
-        parts.append(body)
-        parts.append("    </div>")
-    parts.append("  </div>")
-
-    parts.append("</div>")
-    return "\n".join(parts)
-
-
 def _outline_section(inventory) -> str:
     outline = inventory.outline
     parts = ["<section>"]
@@ -768,146 +474,337 @@ def _schema_section(inventory) -> str:
     return "\n".join(parts)
 
 
-def render(result: AuditResult) -> str:
+# ---------------------------------------------------------------------------------------
+# App shell
+# ---------------------------------------------------------------------------------------
+
+
+@dataclass
+class Page:
+    """One sidebar entry and the panel it reveals."""
+
+    key: str
+    label: str
+    icon: str
+    group: str
+    body: str
+    badge: str = ""
+    hot: bool = False
+
+
+def _nav_css(keys: List[str]) -> str:
+    """Per-page :checked rules. Generated because the page set varies by run."""
+    rules = []
+    for key in keys:
+        rules.append(
+            f"#tab-{key}:checked ~ .main .panels > #panel-{key} {{ display: block; }}\n"
+            f'#tab-{key}:checked ~ .sidebar label[for="tab-{key}"] '
+            "{ background: var(--accent-soft); color: var(--accent); font-weight: 620; }\n"
+            f'#tab-{key}:checked ~ .main .topbar div[data-title="{key}"] {{ display: block; }}\n'
+            f'#tab-{key}:focus-visible ~ .sidebar label[for="tab-{key}"] '
+            "{ outline: 2px solid var(--accent); outline-offset: -2px; }"
+        )
+    return "\n".join(rules)
+
+
+def _stat_card(label: str, value: str, note: str, icon_name: str, accent: bool = False) -> str:
+    cls = " accent" if accent else ""
+    return (
+        f'<div class="stat{cls}">'
+        f'<span class="corner">{icon(icon_name, 14)}</span>'
+        f'<p class="k">{escape(label)}</p>'
+        f'<p class="v">{escape(value)}</p>'
+        f'<p class="d">{note}</p>'
+        "</div>"
+    )
+
+
+def _overview_page(result: AuditResult) -> str:
     counts = result.counts
     total = sum(counts.values())
+    inventory = result.inventory
+    serious = counts["critical"] + counts["high"]
+    report = result.image_sizes
+    measured = report is not None and report.checked and bool(report.measurements)
 
-    chips: List[str] = []
-    for severity in Severity:
-        value = counts[severity.value]
-        if value:
-            chips.append(
-                f'<span class="chip {severity.value}"><b>{value}</b> '
-                f"{SEVERITY_LABEL[severity]}</span>"
-            )
-    if not chips:
-        chips.append('<span class="chip"><b>0</b> issues</span>')
+    images = inventory.images if inventory else None
+    weight = human_size(report.total_bytes) if measured else f"{result.byte_size / 1024:.0f} KB"
+    weight_note = (
+        f"{len(report.measured)} images measured" if measured else "HTML document only"
+    )
+
+    cards = [
+        _stat_card(
+            "Overall score",
+            f"{result.overall_score:.0f}",
+            f'<span class="tone">{len(result.packs)} categories</span>',
+            "gauge",
+            accent=True,
+        ),
+        _stat_card(
+            "Findings",
+            str(total),
+            f'<span class="tone">{serious} need attention</span>'
+            if serious
+            else '<span class="tone">nothing serious</span>',
+            "alert",
+        ),
+        _stat_card(
+            "Images",
+            str(images.total) if images else "0",
+            f'<span class="tone">{len(images.needs_attention)} missing alt</span>'
+            if images
+            else "&nbsp;",
+            "image",
+        ),
+        _stat_card("Page weight", weight, weight_note, "weight"),
+    ]
+
+    meters = []
+    for pack in result.packs:
+        width = max(0.0, min(100.0, pack.score))
+        issues = len(pack.findings)
+        plural = "s" if issues != 1 else ""
+        meters.append(
+            '<div class="meter-row">'
+            f'<div class="mt"><span>{escape(pack.label)}</span>'
+            f'<b style="color:{_score_color(pack.score)}">{pack.score:.0f}'
+            f'<span style="color:var(--ink-3);font-weight:500"> &middot; {issues} issue{plural}'
+            "</span></b></div>"
+            f'<div class="meter"><i style="width:{width:.1f}%;'
+            f'background:{_score_color(pack.score)}"></i></div>'
+            "</div>"
+        )
+
+    legend = [
+        f'<div class="legend-row">'
+        f'<span class="legend-dot" style="background:var(--{severity.value})"></span>'
+        f'<span class="lbl">{SEVERITY_LABEL[severity]}</span>'
+        f'<span class="num">{counts[severity.value]}</span></div>'
+        for severity in Severity
+    ]
 
     facts = [
-        f"<li><b>HTTP {result.status}</b></li>",
-        f"<li><b>{result.elapsed_ms}</b> ms</li>",
-        f"<li><b>{result.byte_size / 1024:.1f}</b> KB</li>",
-        f"<li><b>{total}</b> finding{'s' if total != 1 else ''}</li>",
-        f"<li>Scanned <b>{escape(result.fetched_at)}</b></li>",
+        ("Status", f"HTTP {result.status}"),
+        ("Response time", f"{result.elapsed_ms} ms"),
+        ("Document size", f"{result.byte_size / 1024:.1f} KB"),
+        ("Scanned", result.fetched_at.replace("T", " ").replace("+00:00", " UTC")),
     ]
+    if inventory is not None:
+        facts.append(("Indexable", inventory.index_follow.summary))
+        facts.append(("Canonical", "declared" if inventory.canonical.present else "missing"))
     if result.was_redirected:
-        facts.append(f"<li>Redirected from <b>{escape(result.url)}</b></li>")
+        facts.append(("Redirected from", result.url))
 
-    pack_cards = "\n".join(_pack_card(pack) for pack in result.packs)
-    packs_by_module = {pack.module: pack for pack in result.packs}
+    fact_rows = "".join(
+        f'<li><span class="fk">{escape(k)}</span><span class="fv">{escape(str(v))}</span></li>'
+        for k, v in facts
+    )
+
+    return (
+        "<section>"
+        f'<div class="grid-4">{"".join(cards)}</div>'
+        '<div class="grid-2">'
+        '<div class="card card-pad">'
+        '<div class="card-head"><h3 class="card-title">Category scores</h3>'
+        '<p class="card-note">100 minus weighted deductions</p></div>'
+        f'<div class="meters">{"".join(meters)}</div>'
+        "</div>"
+        '<div class="card card-pad">'
+        '<div class="card-head"><h3 class="card-title">Overall</h3></div>'
+        f"{_ring(result.overall_score)}"
+        f'<div class="legend" style="margin-top:20px">{"".join(legend)}</div>'
+        "</div></div>"
+        '<div class="grid-2">'
+        '<div class="card card-pad">'
+        '<div class="card-head"><h3 class="card-title">Response</h3></div>'
+        f'<ul class="factlist">{fact_rows}</ul></div>'
+        '<div class="card card-pad">'
+        '<div class="card-head"><h3 class="card-title">Scope of this run</h3></div>'
+        '<p class="card-note">Analysis is of the <b>served HTML</b>. Lighthouse performance '
+        "metrics, axe-core accessibility rules, JavaScript-rendered content, and visual review "
+        "require the browser-based modules and are not included.</p>"
+        "</div></div>"
+        "</section>"
+    )
+
+
+def _build_pages(result: AuditResult) -> List[Page]:
+    """Sidebar pages.
+
+    The eight requested sections keep the exact order they were asked for; grouping headings
+    are cosmetic and must not reshuffle them. Anything else the audit produced follows, so no
+    result becomes unreachable.
+    """
+    packs = {pack.module: pack for pack in result.packs}
     inventory = result.inventory
+    document = result.document
 
-    def pack_body(module: str) -> str:
-        pack = packs_by_module.get(module)
-        return _section(pack) if pack else ""
+    pages: List[Page] = [
+        Page("overview", "Dashboard", "dashboard", "Overview", _overview_page(result))
+    ]
 
-    def pack_count(module: str) -> Tuple[str, bool]:
-        pack = packs_by_module.get(module)
-        if not pack or not pack.findings:
-            return "", False
-        return str(len(pack.findings)), True
+    if "http" in packs:
+        pages.append(
+            Page("http", "HTTP Error", "alert", "Overview", _section(packs["http"]), "!", True)
+        )
 
-    tabs: List[Tuple[str, str, str, bool, str]] = []
+    audit_group = "Audit"
 
-    # 1. SEO findings
-    seo_badge, seo_warn = pack_count("seo")
-    tabs.append(("seo", "SEO", seo_badge, seo_warn, pack_body("seo")))
+    if "seo" in packs:
+        count = len(packs["seo"].findings)
+        pages.append(
+            Page("seo", "SEO", "search", audit_group, _section(packs["seo"]),
+                 str(count) if count else "", bool(count))
+        )
 
     if inventory is not None:
-        # 2. Headings, H1-H6 only
-        heading_count = len(result.document.headings) if result.document else 0
-        tabs.append(
-            ("headings", "Headings", str(heading_count), False, _headings_section(result.document))
+        headings = document.headings if document else []
+        pages.append(
+            Page("headings", "Headings", "heading", audit_group,
+                 _headings_section(document), str(len(headings)))
         )
-
-        # 3. Meta tags
-        tabs.append(
-            ("meta", "Meta Tags", str(len(inventory.metas)), False, _meta_section(inventory))
+        pages.append(
+            Page("meta", "Meta Tags", "tag", audit_group, _meta_section(inventory),
+                 str(len(inventory.metas)))
         )
-
-        # 4. Canonical
         canonical_ok = inventory.canonical.present and inventory.canonical.is_self_referencing
-        tabs.append(
-            (
-                "canonical",
-                "Canonical",
-                "ok" if canonical_ok else "check",
-                not canonical_ok,
-                _canonical_section(inventory, result.findings),
-            )
+        pages.append(
+            Page("canonical", "Canonical URLs", "link", audit_group,
+                 _canonical_section(inventory, result.findings),
+                 "ok" if canonical_ok else "check", not canonical_ok)
         )
-
-        # 5. Missing alt text
         flagged = len(inventory.images.needs_attention)
-        tabs.append(
-            (
-                "alt",
-                "Alt Missing",
-                str(flagged) if flagged else "0",
-                bool(inventory.images.missing),
-                _image_alt_section(inventory),
-            )
+        pages.append(
+            Page("alt", "Alt Tag Missing", "image", audit_group, _image_alt_section(inventory),
+                 str(flagged), bool(inventory.images.missing))
         )
 
-    # 6. Image weight
     report = result.image_sizes
     if report is not None and report.checked:
         over = len(report.oversized)
-        size_badge, size_warn = (str(over), True) if over else ("0", False)
+        badge, hot = (str(over), True) if over else ("0", False)
     else:
-        size_badge, size_warn = "off", False
-    tabs.append(("imgsize", "Image Size", size_badge, size_warn, _image_size_section(report)))
+        badge, hot = "off", False
+    pages.append(
+        Page("imgsize", "Image Size", "weight", audit_group, _image_size_section(report),
+             badge, hot)
+    )
 
     if inventory is not None:
-        # 7. Index / follow
         info = inventory.index_follow
         restricted = not (info.indexable and info.followable)
-        tabs.append(
-            (
-                "robots",
-                "Index / Follow",
-                "blocked" if restricted else "ok",
-                restricted,
-                _index_follow_section(inventory),
-            )
+        pages.append(
+            Page("robots", "Index / Follow", "eye", audit_group,
+                 _index_follow_section(inventory),
+                 "blocked" if restricted else "ok", restricted)
+        )
+        pages.append(
+            Page("schema", "Schema", "code", audit_group, _schema_section(inventory),
+                 str(len(inventory.schema.suggested_types)))
         )
 
-        # 8. Schema
-        tabs.append(
-            (
-                "schema",
-                "Schema",
-                str(len(inventory.schema.suggested_types)),
-                False,
-                _schema_section(inventory),
-            )
+    more = "More detail"
+
+    if "images" in packs:
+        count = len(packs["images"].findings)
+        pages.append(
+            Page("images", "Image Issues", "alert", more, _section(packs["images"]),
+                 str(count) if count else "", bool(count))
         )
 
-    # Remaining findings and extracts, so nothing from the audit becomes unreachable.
-    image_badge, image_warn = pack_count("images")
-    if "images" in packs_by_module:
-        tabs.append(("images", "Image Issues", image_badge, image_warn, pack_body("images")))
+    if "assets" in packs and packs["assets"].findings:
+        pages.append(
+            Page("weightissues", "Weight Issues", "weight", more,
+                 _section(packs["assets"]), str(len(packs["assets"].findings)), True)
+        )
 
     if inventory is not None:
-        tabs.append(
-            (
-                "structure",
-                "Structure",
-                str(inventory.outline.total_nodes),
-                False,
-                _outline_section(inventory),
-            )
+        pages.append(
+            Page("structure", "Page Structure", "layers", more,
+                 _outline_section(inventory), str(inventory.outline.total_nodes))
         )
 
-    if "links" in packs_by_module:
-        link_badge, link_warn = pack_count("links")
-        tabs.append(("links", "Links", link_badge, link_warn, pack_body("links")))
+    if "links" in packs:
+        count = len(packs["links"].findings)
+        pages.append(
+            Page("links", "Links", "link", more, _section(packs["links"]),
+                 str(count) if count else "", bool(count))
+        )
 
-    if "http" in packs_by_module:
-        tabs.insert(0, ("http", "HTTP", "!", True, pack_body("http")))
+    return pages
 
-    tab_markup = _render_tabs(tabs)
-    tab_rules = _tab_css([key for key, *_ in tabs])
+
+def render(result: AuditResult, serving: bool = False) -> str:
+    """Render the full report.
+
+    ``serving`` adds links only a running server can honour — the schema generator and a
+    route back to the URL form. A saved file omits them rather than shipping dead links.
+    """
+    pages = _build_pages(result)
+
+    radios = "\n".join(
+        f'  <input type="radio" name="qa-nav" id="tab-{page.key}"'
+        f'{" checked" if index == 0 else ""}>'
+        for index, page in enumerate(pages)
+    )
+
+    nav_parts: List[str] = []
+    current_group = None
+    for page in pages:
+        if page.group != current_group:
+            current_group = page.group
+            nav_parts.append(f'    <p class="navgroup">{escape(page.group)}</p>')
+        pill = (
+            f'<span class="pill{" hot" if page.hot else ""}">{escape(page.badge)}</span>'
+            if page.badge
+            else ""
+        )
+        nav_parts.append(
+            f'    <label class="navitem" for="tab-{page.key}">{icon(page.icon)}'
+            f'<span class="navlabel">{escape(page.label)}</span>{pill}</label>'
+        )
+
+    if serving:
+        nav_parts.append('    <p class="navgroup">Tools</p>')
+        nav_parts.append(
+            f'    <a class="navitem" href="/schema">{icon("wand")}'
+            '<span class="navlabel">Schema Generator</span></a>'
+        )
+        nav_parts.append(
+            f'    <a class="navitem" href="/">{icon("back")}'
+            '<span class="navlabel">Audit another page</span></a>'
+        )
+
+    titles = "\n".join(
+        f'        <div data-title="{page.key}" class="pagetitle">'
+        f"<h1>{escape(page.label)}</h1></div>"
+        for page in pages
+    )
+
+    panels = "\n".join(
+        f'        <div class="panel" id="panel-{page.key}">\n{page.body}\n        </div>'
+        for page in pages
+    )
+
+    if serving:
+        side_card = (
+            '<div class="sidecard"><h4>Schema Generator</h4>'
+            "<p>Paste content and get schema.org JSON-LD back.</p></div>"
+        )
+        actions = (
+            '<a class="btn primary" href="/schema">Schema Generator</a>'
+            '<a class="btn" href="/">New audit</a>'
+        )
+    else:
+        side_card = (
+            '<div class="sidecard"><h4>Run it yourself</h4>'
+            "<p>Dependency-free. No install, no database.</p>"
+            "<code>python -m audit --serve</code></div>"
+        )
+        actions = ""
+
+    nav_rules = _nav_css([page.key for page in pages])
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -916,45 +813,49 @@ def render(result: AuditResult) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QA Audit — {escape(result.page_title)}</title>
 <style>{_CSS}
-{tab_rules}</style>
+.pagetitle {{ display: none; }}
+{nav_rules}</style>
 </head>
 <body>
-<div class="wrap">
+<div class="app" role="radiogroup" aria-label="Report sections">
+{radios}
 
-<header class="head">
-  <div class="head-main">
-    <p class="eyebrow">Website QA Audit</p>
-    <h1>{escape(result.page_title)}</h1>
-    <p class="url"><a href="{escape(result.final_url)}">{escape(result.final_url)}</a></p>
-    <ul class="facts">
-{chr(10).join("      " + f for f in facts)}
-    </ul>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">{BRAND_MARK}</span>
+      <span><span class="brand-name">Website QA</span><br>
+      <span class="brand-sub">Audit report</span></span>
+    </div>
+{chr(10).join(nav_parts)}
+    <div class="sidefoot">{side_card}</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-main">
+        <p class="crumb">Website QA Audit</p>
+{titles}
+        <p class="sub"><a href="{escape(result.final_url)}">{escape(result.final_url)}</a>
+        &nbsp;&middot;&nbsp; {escape(result.page_title)}</p>
+      </div>
+      <div class="topbar-side">{actions}</div>
+    </header>
+
+    <div class="content">
+      <div class="panels">
+{panels}
+      </div>
+
+      <footer class="foot">
+        Generated by <code>python -m audit</code> from the <b>AI Website QA Platform</b>
+        &mdash; a dependency-free static HTML audit engine (Python standard library only,
+        no third-party packages).<br>
+        Analysis is of the <b>served HTML</b>. Lighthouse performance metrics, axe-core
+        accessibility rules, JavaScript-rendered content, and visual review require the
+        browser-based modules and are <b>not</b> part of this report.
+      </footer>
+    </div>
   </div>
-  {_ring(result.overall_score)}
-</header>
-
-<div class="chips">
-  {" ".join(chips)}
-</div>
-
-<div class="packs">
-{pack_cards}
-</div>
-
-{tab_markup}
-
-<footer>
-  Generated by <code>python -m audit</code> from the
-  <b>AI Website QA Platform</b> &mdash; a dependency-free static HTML audit engine
-  (Python standard library only, no third-party packages).<br>
-  Scope of this run: SEO metadata, heading structure, image accessibility and optimisation
-  hints, and&mdash;when enabled&mdash;link reachability, plus a content listing, structure
-  outline, image alt inventory, and generated schema.org markup. Analysis is of the
-  <b>served HTML</b>: Lighthouse performance metrics, axe-core accessibility rules,
-  JavaScript-rendered content, and visual/design review require the browser-based modules
-  and are <b>not</b> part of this report.
-</footer>
-
 </div>
 </body>
 </html>
