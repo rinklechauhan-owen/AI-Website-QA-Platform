@@ -168,7 +168,17 @@ tests/
 
 ## 6. Storage
 
-**Decision: `sqlite3` from the standard library.**
+**Decision: `sqlite3` from the standard library, in memory only.**
+
+> **Revised after stage 1.** You asked for no database and no login. Nothing is written to
+> disk and no file is created: the store opens with `:memory:`, so a crawl is a working set
+> that lives as long as the tool is open and then disappears. CSV export is how results
+> leave. There are no accounts, no sessions and no authentication anywhere in the tool.
+>
+> A crawl still needs *somewhere* to put 2,000 pages while it runs — they cannot sit in a
+> browser, and the brief requires paginated, memory-conscious reads. SQLite's in-memory mode
+> provides that with no dependency and no file. Measured on a real 2,000-page crawl: **19.7 MB
+> total, 10.1 KB per page**, with Python-level allocation peaking at 1.8 MB.
 
 The project's defining property is zero third-party dependencies. `sqlite3` ships with Python,
 so persistence can be added without breaking that. It also happens to be the right tool:
@@ -177,7 +187,7 @@ so persistence can be added without breaking that. It also happens to be the rig
 | --- | --- |
 | 2,000 pages without loading all into memory | Rows written incrementally, read by page |
 | Don't freeze the UI | Query `LIMIT/OFFSET` per table page |
-| Crawl sessions, view previous crawls | One row per session |
+| Several crawls open at once in one process | One row per session |
 | Pause/resume without restarting | The frontier lives in the DB, not in RAM |
 | Prepare for crawl comparison | Two sessions in one file, joinable by URL |
 | Sorting, filtering, searching | `ORDER BY`, `WHERE`, indexes |

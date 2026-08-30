@@ -147,6 +147,8 @@ class Document:
     jsonld_blocks: List[str] = field(default_factory=list)
     text_length: int = 0
     picture_sources: List[str] = field(default_factory=list)
+    # <link rel="alternate" hreflang="..."> entries: {"hreflang": ..., "href": ...}
+    hreflang: List[Dict[str, str]] = field(default_factory=list)
     # Headings and paragraphs in document order.
     blocks: List[TextBlock] = field(default_factory=list)
     root: Optional[Node] = None
@@ -303,6 +305,13 @@ class _DocumentParser(HTMLParser):
             rels = (attr.get("rel") or "").lower().split()
             if "canonical" in rels and attr.get("href"):
                 self.doc.canonical = self._absolute(attr["href"])
+            if "alternate" in rels and attr.get("hreflang"):
+                self.doc.hreflang.append(
+                    {
+                        "hreflang": attr["hreflang"],
+                        "href": self._absolute(attr.get("href") or ""),
+                    }
+                )
 
         elif tag == "img":
             self._image_count += 1
