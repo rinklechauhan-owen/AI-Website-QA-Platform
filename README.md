@@ -14,7 +14,13 @@ Full product spec: [docs/PRD.md](docs/PRD.md) &nbsp;·&nbsp; Overview: [docs/SUM
 The audit engine in [`audit/`](audit/) is **written against the Python standard library only** —
 no `pip install`, no database, no Docker, no API keys. If you have Python 3.9+, it runs.
 
-**Paste URLs into a browser** — starts a local web UI and opens it:
+**Crawl a whole website** — up to 2,000 pages, following internal links:
+
+```bash
+python -m audit https://example.com --crawl
+```
+
+**Paste URLs into a browser** — starts a local web UI with both modes:
 
 ```bash
 python -m audit --serve
@@ -60,6 +66,11 @@ python -m audit --serve [--port N] [--no-browser]
       --check-images             measure image transfer sizes (one request per image)
       --image-size-limit MB      flag images heavier than this (default: 2.5)
       --max-links N              cap on links checked (default: 40)
+      --crawl                    crawl the whole site instead of one page
+      --max-urls N               with --crawl, page limit (default: 2000)
+      --max-depth N              with --crawl, link depth (default: unlimited)
+      --concurrency N            with --crawl, simultaneous requests (default: 5)
+      --ignore-robots            with --crawl, do not obey robots.txt
       --content-tags TAGS        tags listed in the content section (default: h1..h6)
       --outline-depth N          nesting depth shown in the structure outline (default: 8)
       --timeout SECONDS          per-request timeout (default: 20)
@@ -105,7 +116,7 @@ Two layers, at different maturities. Being explicit about which is which:
 
 | Layer | State |
 | --- | --- |
-| [`audit`](audit/) — static analysis engine, CLI, and web UI | **Working.** SEO, image, link, and image-weight rule packs; dashboard UI; 241 tests |
+| [`audit`](audit/) — engine, crawler, CLI, and web UI | **Working.** Single-page audit and full-site crawler; 55 rules; dashboard UI; 529 tests |
 | [`services/api/`](services/api/) — FastAPI + Celery service | **Scaffold.** Models, schemas, task orchestration, and migrations wired; audit modules are registered stubs |
 | [`apps/web/`](apps/web/) — Next.js dashboard | **Scaffold.** Layout, typed API client, and scan form; no report views yet |
 
@@ -136,6 +147,30 @@ mixed-content images on HTTPS pages, plain-HTTP links.
 
 Each finding carries a stable rule ID, a severity, and a specific fix — not just a label.
 Scores start at 100 per pack and deduct by severity; `info` findings never reduce a score.
+
+### Two modes
+
+| Mode | What it does |
+| --- | --- |
+| **Single Page Audit** | Audits one URL in full. Unchanged from before the crawler existed. |
+| **Full Website Crawl** | Follows internal links across a site, up to 2,000 pages, and finds problems only visible across a whole site. |
+
+Both use the same analysis. `audit_url()` is `fetch()` + `audit_response()`; the crawler fetches
+each page itself and calls the same `audit_response()`, so one URL and two thousand get
+identical results with no duplicated rule logic.
+
+**Crawls are never saved.** They live in memory while the tool is open, with no database file,
+no accounts and no login. Export to CSV to keep anything. Measured on a real 2,000-page crawl:
+64 seconds at 31 URL/s, 19.7 MB of memory, 10.1 KB per page.
+
+Site-wide checks that a single-page audit cannot make: duplicate titles, descriptions and H1s;
+orphan pages; pages with almost no internal links; redirect chains and links pointing at them;
+broken internal and external links **with the pages that contain them**; sitemap-versus-crawl
+comparison; non-indexable pages; missing canonicals; thin content.
+
+Crawl screens: a dashboard, a sortable and filterable URL table, an issue list where clicking
+an issue shows only the URLs it affects, a per-URL detail view, a link table, a robots and
+sitemap view, and CSV export of any of them.
 
 ### Report pages
 
@@ -208,7 +243,7 @@ can't be mistaken for a full audit.
 
 ## Tests
 
-241 tests, standard library `unittest`, no network access required:
+529 tests, standard library `unittest`, no network access required:
 
 ```bash
 python -m unittest discover -s tests -t . -v

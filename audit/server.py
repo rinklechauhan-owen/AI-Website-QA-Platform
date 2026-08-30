@@ -14,11 +14,15 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional, Tuple
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from audit import __version__
 from audit.engine import audit_url
 from audit.fetch import FetchError
+from audit.crawl import export as crawl_export
+from audit.crawl.manager import CrawlManager
+from audit.crawl.settings import CrawlSettings
+from audit.report import crawl_pages
 from audit.report import html as html_report
 from audit.report import pages as page_views
 from audit.schemagen import VALID_TYPES, GeneratedSchema, generate
@@ -31,6 +35,9 @@ MAX_URL_LENGTH = 2048
 
 # Room for a pasted page of markup in the schema generator.
 MAX_BODY_BYTES = 512 * 1024
+
+# Crawls are held here for the life of the process. Nothing is written to disk.
+CRAWLS = CrawlManager()
 
 # Schemes that must never reach the fetcher, even though it would fail on them anyway —
 # a clear rejection beats a confusing connection error.
@@ -104,8 +111,143 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _send_csv(self, chunks, filename: str) -> None:
+        """Stream a CSV without building it in memory first."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        try:
+            for chunk in chunks:
+                if chunk:
+                    self.wfile.write(chunk.encode("utf-8"))
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _crawl_or_404(self, key: str):
+        try:
+            crawler = CRAWLS.get(int(key))
+        except (TypeError, ValueError):
+            crawler = None
+        if crawler is None:
+            self._send(
+                crawl_pages.crawl_form(error="That crawl is no longer available."), status=404
+            )
+        return crawler
+
+    def _route_crawl_get(self, parsed) -> bool:
+        """Crawl screens. Returns True when the path was handled."""
+        parts = [p for p in parsed.path.split("/") if p]
+        if not parts or parts[0] != "crawl":
+            return False
+
+        params = parse_qs(parsed.query)
+        first = lambda name, default="": (params.get(name) or [default])[0]
+
+        if len(parts) == 1:
+            self._send(crawl_pages.crawl_form())
+            return True
+
+        crawler = self._crawl_or_404(parts[1])
+        if crawler is None:
+            return True
+
+        store, session_id = crawler.store, crawler.session_id
+        section = parts[2] if len(parts) > 2 else ""
+
+        if not section:
+            if crawler.state.is_finished:
+                self._send(crawl_pages.dashboard(store, session_id, crawler.progress))
+            else:
+                self._send(crawl_pages.progress_page(crawler.progress, crawler.settings))
+            return True
+
+        if section == "urls":
+            try:
+                page = max(1, int(first("page", "1")))
+            except ValueError:
+                page = 1
+            self._send(
+                crawl_pages.url_table(
+                    store,
+                    session_id,
+                    page=page,
+                    sort=first("sort", "url"),
+                    descending=bool(first("desc")),
+                    search=first("q"),
+                    filter_key=first("filter", "all"),
+                )
+            )
+            return True
+
+        if section == "issues":
+            if len(parts) > 3:
+                try:
+                    page = max(1, int(first("page", "1")))
+                except ValueError:
+                    page = 1
+                self._send(
+                    crawl_pages.issue_detail(store, session_id, unquote(parts[3]), page)
+                )
+            else:
+                self._send(crawl_pages.issue_list(store, session_id))
+            return True
+
+        if section == "url" and len(parts) > 3:
+            try:
+                url_id = int(parts[3])
+            except ValueError:
+                url_id = 0
+            self._send(crawl_pages.url_detail(store, session_id, url_id))
+            return True
+
+        if section == "links":
+            try:
+                page = max(1, int(first("page", "1")))
+            except ValueError:
+                page = 1
+            self._send(crawl_pages.links_page(store, session_id, page))
+            return True
+
+        if section == "technical":
+            robots_info, sitemap_info = {}, {}
+            if crawler.robots is not None:
+                robots_info = {
+                    "url": crawler.robots.url,
+                    "found": crawler.robots.found,
+                    "status": crawler.robots.status,
+                    "summary": crawler.robots.summary(),
+                    "sitemaps": crawler.robots.sitemaps,
+                    "rules": [str(rule) for rule in crawler.robots.rules],
+                    "crawl_delay": crawler.robots.crawl_delay,
+                }
+            if crawler.sitemap is not None:
+                sitemap_info = crawler.sitemap.to_dict()
+            self._send(crawl_pages.technical_page(store, session_id, robots_info, sitemap_info))
+            return True
+
+        if section == "export":
+            kind = parts[3] if len(parts) > 3 else "urls"
+            rule = first("rule")
+            try:
+                chunks = crawl_export.export(store, session_id, kind, rule)
+            except ValueError:
+                self._send(crawl_pages.issue_list(store, session_id), status=404)
+                return True
+            self._send_csv(chunks, crawl_export.filename_for(kind, rule))
+            return True
+
+        self._send(crawl_pages.crawl_form(error="No such crawl page."), status=404)
+        return True
+
     def do_GET(self) -> None:  # noqa: N802 - name fixed by the base class
         parsed = urlparse(self.path)
+
+        if self._route_crawl_get(parsed):
+            return
+
 
         if parsed.path in ("/", "/index.html"):
             # Support /?url=... so a URL can be linked or bookmarked directly.
@@ -133,7 +275,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - name fixed by the base class
         route = urlparse(self.path).path
-        if route not in ("/audit", "/schema"):
+        crawl_parts = [p for p in route.split("/") if p]
+        is_crawl = bool(crawl_parts) and crawl_parts[0] == "crawl"
+        if not is_crawl and route not in ("/audit", "/schema"):
             self._send(page_views.audit_form(error="Page not found."), status=404)
             return
 
@@ -150,6 +294,10 @@ class _Handler(BaseHTTPRequestHandler):
             self.rfile.read(length).decode("utf-8", errors="replace"), keep_blank_values=True
         )
 
+        if is_crawl:
+            self._handle_crawl_post(crawl_parts, fields)
+            return
+
         if route == "/schema":
             self._generate_schema(fields)
             return
@@ -159,6 +307,80 @@ class _Handler(BaseHTTPRequestHandler):
             check_links=bool(fields.get("check_links")),
             check_images=bool(fields.get("check_images")),
         )
+
+    def _handle_crawl_post(self, parts, fields) -> None:
+        """Start a crawl, or act on a running one."""
+        if len(parts) == 1:
+            self._start_crawl(fields)
+            return
+
+        crawler = self._crawl_or_404(parts[1])
+        if crawler is None:
+            return
+
+        action = parts[2] if len(parts) > 2 else ""
+        if action == "pause":
+            crawler.pause()
+        elif action == "resume":
+            crawler.resume()
+        elif action == "stop":
+            crawler.stop()
+
+        self._redirect(f"/crawl/{parts[1]}")
+
+    def _start_crawl(self, fields) -> None:
+        raw_url = (fields.get("url") or [""])[0]
+        url, error = _validate(raw_url)
+        if error:
+            self._send(crawl_pages.crawl_form(error, raw_url), status=400)
+            return
+
+        def flag(name: str) -> bool:
+            return bool(fields.get(name))
+
+        def number(name: str, fallback):
+            try:
+                return int((fields.get(name) or [""])[0])
+            except (TypeError, ValueError):
+                return fallback
+
+        def patterns(name: str):
+            raw = (fields.get(name) or [""])[0]
+            return [p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()]
+
+        depth = (fields.get("max_depth") or [""])[0].strip()
+
+        settings = CrawlSettings(
+            max_urls=number("max_urls", 2000),
+            max_depth=int(depth) if depth.isdigit() else None,
+            concurrency=number("concurrency", 5),
+            delay_ms=number("delay_ms", 0),
+            respect_robots=flag("respect_robots"),
+            follow_redirects=flag("follow_redirects"),
+            crawl_subdomains=flag("crawl_subdomains"),
+            check_external_links=flag("check_external_links"),
+            check_image_sizes=flag("check_image_sizes"),
+            include_pdfs=flag("include_pdfs"),
+            ignore_query=flag("ignore_query"),
+            discover_sitemaps=flag("discover_sitemaps"),
+            include_patterns=patterns("include_patterns"),
+            exclude_patterns=patterns("exclude_patterns"),
+        )
+
+        try:
+            crawler = CRAWLS.start(url, settings)
+        except ValueError as exc:
+            self._send(crawl_pages.crawl_form(str(exc), raw_url), status=400)
+            return
+
+        self._redirect(f"/crawl/{crawler.manager_id}")
+
+    def _redirect(self, location: str) -> None:
+        """POST-then-redirect, so refreshing a progress page never re-submits the form."""
+        self.send_response(303)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _generate_schema(self, fields) -> None:
         content = (fields.get("content") or [""])[0]

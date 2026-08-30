@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from audit.crawl import robots as robots_module
+from audit.crawl import siterules
 from audit.crawl import sitemap as sitemap_module
 from audit.crawl import urlnorm
 from audit.crawl.fetcher import FetchOutcome, fetch_page
@@ -205,6 +206,7 @@ class Crawler:
         self.root_url = normalised
 
         self.robots: Optional[robots_module.RobotsTxt] = None
+        self.site_report: Optional[siterules.SiteReport] = None
         self.sitemap: Optional[sitemap_module.SitemapReport] = None
         self.frontier = Frontier(self.root_url, self.settings)
 
@@ -386,12 +388,22 @@ class Crawler:
         self.store.update_session(
             self.session_id, urls_discovered=self.frontier.stats.discovered
         )
+        if self.sitemap:
+            self._mark_sitemap_coverage()
+
+        # Site-wide analysis runs last, because duplicate titles and orphan pages are only
+        # knowable once every page has been seen. A failure here must not lose the crawl.
+        try:
+            self.site_report = siterules.analyse(
+                self.store, self.session_id, self.settings, self.sitemap
+            )
+        except Exception as exc:  # noqa: BLE001 - the crawl results still stand
+            self._message = f"Site-wide analysis failed: {exc}"
+
         self.store.finish_session(
             self.session_id,
             status="stopped" if self.state is CrawlState.STOPPED else "completed",
         )
-        if self.sitemap:
-            self._mark_sitemap_coverage()
         return self.progress
 
     def _mark_sitemap_coverage(self) -> None:

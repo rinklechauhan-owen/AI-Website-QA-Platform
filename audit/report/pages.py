@@ -59,6 +59,7 @@ def _shell(
     """App shell for a standalone page. Sidebar links are real anchors here, not radios."""
     nav = [
         ("/", "Audit a page", "search"),
+        ("/crawl", "Crawl a website", "layers"),
         ("/schema", "Schema Generator", "wand"),
     ]
     items = "\n".join(
@@ -118,7 +119,10 @@ def _shell(
 def audit_form(error: Optional[str] = None, url_value: str = "") -> str:
     error_block = f'<p class="err"><b>Could not run that audit</b>{escape(error)}</p>' if error else ""
 
+    from audit.report.crawl_pages import mode_chooser
+
     body = f"""      <div class="formwrap">
+{mode_chooser()}
         {error_block}
         <div class="card card-pad">
           <form method="post" action="/audit">
@@ -154,7 +158,7 @@ def audit_form(error: Optional[str] = None, url_value: str = "") -> str:
         title="Website QA Audit",
         page_title="Audit a page",
         crumb="Website QA",
-        subtitle="SEO, headings, meta tags, canonical, images and schema — in one pass.",
+        subtitle="Audit one page in full, or crawl an entire website.",
         body=body,
         active="/",
     )

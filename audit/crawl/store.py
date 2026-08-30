@@ -1,9 +1,13 @@
-"""Crawl persistence, on `sqlite3` from the standard library.
+"""Crawl storage, on `sqlite3` from the standard library.
 
-Chosen because it adds no dependency while solving several requirements at once: 2,000 pages
-are written incrementally rather than held in memory, tables are read a page at a time so a
-large crawl never blocks the interface, a paused crawl can resume because the frontier is on
-disk, and two sessions can sit in one file so crawls can later be compared.
+**In memory by default — nothing is written to disk.** A crawl is a working set that lives as
+long as the tool is open and then disappears; CSV export is how results leave. There are no
+accounts and no login anywhere in the tool.
+
+Storage is still needed while a crawl runs: 2,000 pages cannot sit in a browser, and they are
+written incrementally rather than accumulated in Python objects, so tables can be read a page
+at a time without a large crawl blocking the interface. SQLite's in-memory mode gives that for
+no dependency and no file. Measured on a real 2,000-page crawl: 19.7 MB, 10.1 KB per page.
 
 Rows carry both flat columns and the full ``AuditResult`` JSON. The columns let tables sort,
 filter and aggregate in SQL; the JSON lets the URL detail view re-render a page exactly as the
@@ -595,3 +599,79 @@ class CrawlStore:
             for table in ("crawl_issue", "crawl_link", "crawl_url", "crawl_frontier"):
                 conn.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM crawl_session WHERE id = ?", (session_id,))
+
+    # --- site-wide queries -----------------------------------------------------
+
+    def url_status_map(self, session_id: int) -> Dict[str, Optional[int]]:
+        """Every crawled URL and the status it returned, keyed by both requested and final URL.
+
+        Broken-link detection reads this instead of re-requesting pages the crawl already
+        fetched, which is what keeps link checking from doubling the request count.
+        """
+        statuses: Dict[str, Optional[int]] = {}
+        for row in self._query(
+            "SELECT url, final_url, status_code FROM crawl_url WHERE session_id = ?",
+            (session_id,),
+        ):
+            statuses[row["url"]] = row["status_code"]
+            if row["final_url"]:
+                statuses.setdefault(row["final_url"], row["status_code"])
+        return statuses
+
+    def distinct_link_targets(self, session_id: int, internal: Optional[bool] = None):
+        clause = "" if internal is None else " AND is_internal = ?"
+        params = (session_id,) if internal is None else (session_id, 1 if internal else 0)
+        return self._query(
+            "SELECT target_url, COUNT(*) AS n, MIN(source_url) AS example_source "
+            f"FROM crawl_link WHERE session_id = ?{clause} "
+            "GROUP BY target_url ORDER BY n DESC",
+            params,
+        )
+
+    def links_by_target(self, session_id: int, targets: Sequence[str]):
+        """Source pages for a set of target URLs, so a broken link names who links to it."""
+        if not targets:
+            return []
+        rows = []
+        # Chunked to stay under SQLite's variable limit on large crawls.
+        for start in range(0, len(targets), 400):
+            chunk = list(targets[start : start + 400])
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(
+                self._query(
+                    f"SELECT source_url, target_url, anchor_text FROM crawl_link "
+                    f"WHERE session_id = ? AND target_url IN ({placeholders})",
+                    (session_id, *chunk),
+                )
+            )
+        return rows
+
+    def redirect_rows(self, session_id: int):
+        return self._query(
+            "SELECT * FROM crawl_url WHERE session_id = ? AND redirect_hops > 0 "
+            "ORDER BY redirect_hops DESC, url",
+            (session_id,),
+        )
+
+    def rows_where(self, session_id: int, where: str, params: Sequence = (), limit: int = 5000):
+        return self._query(
+            f"SELECT * FROM crawl_url WHERE session_id = ? AND {where} ORDER BY url LIMIT ?",
+            (session_id, *params, limit),
+        )
+
+    def set_link_status(self, session_id: int, statuses: Dict[str, Optional[int]]) -> None:
+        if not statuses:
+            return
+        with self._write() as conn:
+            conn.executemany(
+                "UPDATE crawl_link SET status_code = ? WHERE session_id = ? AND target_url = ?",
+                [(status, session_id, url) for url, status in statuses.items()],
+            )
+
+    def clear_issues_for_module(self, session_id: int, module: str) -> None:
+        """Site-wide findings are recomputed wholesale, so the previous run is cleared first."""
+        with self._write() as conn:
+            conn.execute(
+                "DELETE FROM crawl_issue WHERE session_id = ? AND module = ?",
+                (session_id, module),
+            )

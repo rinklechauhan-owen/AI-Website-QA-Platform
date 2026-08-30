@@ -96,6 +96,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="cap on links checked by --check-links (default: 40)",
     )
     parser.add_argument(
+        "--crawl",
+        action="store_true",
+        help="crawl the whole website from this URL instead of auditing one page",
+    )
+    parser.add_argument(
+        "--max-urls",
+        type=int,
+        default=None,
+        metavar="N",
+        help="with --crawl, the maximum URLs to visit (default: 2000)",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=None,
+        metavar="N",
+        help="with --crawl, how many links deep to go (default: unlimited)",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=5,
+        metavar="N",
+        help="with --crawl, simultaneous requests (default: 5)",
+    )
+    parser.add_argument(
+        "--ignore-robots",
+        action="store_true",
+        help="with --crawl, do not obey robots.txt",
+    )
+    parser.add_argument(
         "--check-images",
         action="store_true",
         help="measure every image's transfer size (one extra request per image)",
@@ -161,6 +192,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if not args.url:
         parser.error("a url is required unless --serve is given")
+
+    if args.crawl:
+        return _run_crawl(args)
 
     output_format = "html" if args.open_after and args.format == "text" else args.format
 
@@ -228,3 +262,106 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _run_crawl(args) -> int:
+    """Crawl a whole site from the command line and print a summary."""
+    from audit.crawl import export as crawl_export
+    from audit.crawl.crawler import Crawler
+    from audit.crawl.settings import DEFAULT_MAX_URLS, CrawlSettings
+    from audit.crawl.store import CrawlStore
+
+    settings = CrawlSettings(
+        max_urls=args.max_urls or DEFAULT_MAX_URLS,
+        max_depth=args.max_depth,
+        concurrency=args.concurrency,
+        timeout=args.timeout,
+        user_agent=args.user_agent,
+        verify_tls=not args.insecure,
+        respect_robots=not args.ignore_robots,
+        check_image_sizes=args.check_images,
+        image_size_limit=int(args.image_size_limit * 1024 * 1024),
+        check_external_links=args.check_links,
+    )
+
+    store = CrawlStore(":memory:")
+    try:
+        crawler = Crawler(args.url, settings, store)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+
+    print(f"Crawling {crawler.root_url} (up to {settings.max_urls:,} URLs)...", file=sys.stderr)
+
+    try:
+        crawler.run()
+    except KeyboardInterrupt:
+        crawler.stop()
+        print("\ninterrupted; stopping", file=sys.stderr)
+
+    session_id = crawler.session_id
+    progress = crawler.progress
+    buckets = store.status_breakdown(session_id)
+    session = store.get_session(session_id)
+
+    if args.format == "json":
+        payload = {
+            "root_url": crawler.root_url,
+            "progress": progress.to_dict(),
+            "status_breakdown": buckets,
+            "health_score": session.health_score,
+            "issues": [dict(row) for row in store.issue_summary(session_id)],
+        }
+        body = json.dumps(payload, indent=2)
+    elif args.format == "html":
+        from audit.report import crawl_pages
+
+        body = crawl_pages.dashboard(store, session_id, progress)
+    else:
+        lines = [
+            "=" * 78,
+            "  WEBSITE CRAWL",
+            "=" * 78,
+            f"  Site         {crawler.root_url}",
+            f"  Crawled      {progress.crawled:,} of {progress.discovered:,} discovered",
+            f"  Health       {session.health_score or 0:.0f}/100",
+            f"  Elapsed      {progress.elapsed_s:.0f}s at {progress.urls_per_second} URL/s",
+            "",
+            f"  2xx {buckets['2xx']:,}   3xx {buckets['3xx']:,}   "
+            f"4xx {buckets['4xx']:,}   5xx {buckets['5xx']:,}   failed {buckets['failed']:,}",
+            "",
+            "-" * 78,
+            "  ISSUES",
+            "-" * 78,
+        ]
+        for row in store.issue_summary(session_id)[:40]:
+            lines.append(f"  {row['severity']:<9} {row['urls']:>6}  {row['title'][:55]}")
+        lines.append("=" * 78)
+        body = "\n".join(lines)
+
+    if args.out:
+        path = Path(args.out)
+        if path.parent != Path(""):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        if path.suffix.lower() == ".csv":
+            path.write_text(
+                crawl_export.collect(crawl_export.urls_csv(store, session_id)), encoding="utf-8"
+            )
+        else:
+            path.write_text(body, encoding="utf-8")
+        print(f"Wrote {path.resolve()}", file=sys.stderr)
+    else:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(errors="replace")
+        print(body)
+
+    if args.fail_on:
+        threshold = _SEVERITY_RANK[Severity(args.fail_on)]
+        counts = store.severity_counts(session_id)
+        for severity, rank in _SEVERITY_RANK.items():
+            if rank <= threshold and counts.get(severity.value, 0):
+                store.close()
+                return EXIT_FINDINGS
+
+    store.close()
+    return EXIT_OK
