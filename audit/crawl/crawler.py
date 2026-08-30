@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+from audit.crawl import rendering
 from audit.crawl import robots as robots_module
 from audit.crawl import siterules
 from audit.crawl import sitemap as sitemap_module
@@ -145,6 +146,30 @@ class CrawlProgress:
         }
 
 
+class _RateLimiter:
+    """Enforces a minimum interval between requests across every worker.
+
+    robots.txt Crawl-delay is a site-wide instruction, not a per-worker one. Sleeping inside
+    each worker would let N workers make N requests per interval, so the wait is coordinated
+    here against the time of the last request by any worker.
+    """
+
+    def __init__(self, interval: float = 0.0) -> None:
+        self.interval = max(0.0, interval)
+        self._lock = threading.Lock()
+        self._next_at = 0.0
+
+    def wait(self) -> None:
+        if self.interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait_for = max(0.0, self._next_at - now)
+            self._next_at = max(now, self._next_at) + self.interval
+        if wait_for:
+            time.sleep(wait_for)
+
+
 class Renderer:
     """Seam for JavaScript rendering.
 
@@ -228,6 +253,7 @@ class Crawler:
         self._warnings = 0
         self._redirects = 0
         self._message = ""
+        self._limiter = _RateLimiter(self.settings.delay_ms / 1000)
 
     # --- progress --------------------------------------------------------------
 
@@ -331,6 +357,17 @@ class Crawler:
                 verify_tls=self.settings.verify_tls,
             )
             self.store.update_session(self.session_id, sitemap_json=_json(self.sitemap.to_dict()))
+
+        # A site asking crawlers to wait must be obeyed, and the wait has to be site-wide
+        # rather than per worker, or concurrency would multiply the request rate straight
+        # back up. The stricter of the site's request and the user's setting wins.
+        if self.settings.respect_robots and self.robots and self.robots.crawl_delay:
+            interval = max(self.settings.delay_ms / 1000, float(self.robots.crawl_delay))
+            self._limiter = _RateLimiter(interval)
+            self._message = (
+                f"robots.txt asks for {self.robots.crawl_delay:g}s between requests; "
+                "crawling at that rate."
+            )
 
         self.frontier.seed()
 
@@ -440,8 +477,6 @@ class Crawler:
                 self._record_failure(item, f"{exc.__class__.__name__}: {exc}")
             finally:
                 self.frontier.done(item)
-                if self.settings.delay_ms:
-                    time.sleep(self.settings.delay_ms / 1000)
 
     # --- per-page --------------------------------------------------------------
 
@@ -490,6 +525,7 @@ class Crawler:
         for attempt in range(attempts):
             if self._stop.is_set():
                 break
+            self._limiter.wait()
             outcome = fetch_page(
                 item.url,
                 timeout=self.settings.timeout,
@@ -532,6 +568,9 @@ class Crawler:
         }
 
         if document is not None:
+            signal = rendering.looks_client_rendered(document)
+            record["client_rendered"] = 1 if signal.client_rendered else 0
+            record["render_note"] = "; ".join(signal.reasons)[:400] if signal.reasons else None
             record.update(
                 {
                     "title": document.title or "",

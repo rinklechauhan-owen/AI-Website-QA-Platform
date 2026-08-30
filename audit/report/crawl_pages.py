@@ -125,6 +125,13 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .kv dt { color: var(--ink-2); }
 .kv dd { margin: 0; word-break: break-all; font-weight: var(--fw-medium); }
 .exports { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.banner { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px;
+          border-radius: var(--r-lg); background: var(--surface); margin-bottom: 18px;
+          border: 1px solid var(--medium); border-left: 4px solid var(--medium); }
+.banner .ic { color: var(--medium); flex: 0 0 auto; margin-top: 1px; }
+.banner h4 { margin: 0 0 5px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.banner p { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.banner a { font-weight: var(--fw-semibold); }
 """
 
 
@@ -474,6 +481,22 @@ def dashboard(
         session_id, "status_code >= 200 AND status_code < 300 AND issue_count = 0"
     )
 
+    rendered = store.count_urls(session_id, "client_rendered = 1")
+    banner = ""
+    if rendered:
+        share = round(rendered / max(crawled, 1) * 100)
+        banner = (
+            f'<div class="banner"><span class="ic">{icon("alert", 20)}</span><div>'
+            f"<h4>{rendered:,} of {crawled:,} pages ({share}%) build their content in the "
+            "browser</h4>"
+            "<p>This audit reads the HTML the server sends, which is what a crawler sees "
+            "before any script runs. On those pages, findings like missing headings or thin "
+            "content may describe what this tool cannot see rather than a real problem. "
+            f'<a href="/crawl/{session_id}/issues/site.javascript-rendered">See which pages</a>'
+            ", and confirm anything important with Google Search Console&rsquo;s URL "
+            "Inspection, which shows the rendered page.</p></div></div>"
+        )
+
     cards = "".join(
         [
             _stat("Pages crawled", f"{crawled:,}", f"of {session.urls_discovered:,} discovered",
@@ -527,7 +550,8 @@ def dashboard(
         for depth, count in sorted(store.depth_breakdown(session_id).items())
     )
 
-    body = f"""      <div class="grid-4">{cards}</div>
+    body = f"""{banner}
+      <div class="grid-4">{cards}</div>
 
       <div class="grid-2">
         <div class="card card-pad">

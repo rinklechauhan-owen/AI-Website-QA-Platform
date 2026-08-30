@@ -83,6 +83,7 @@ class SiteReport:
     broken_links: List[BrokenLink] = field(default_factory=list)
     redirects: List[RedirectRow] = field(default_factory=list)
     orphans: List[str] = field(default_factory=list)
+    client_rendered: List[str] = field(default_factory=list)
     sitemap: SitemapComparison = field(default_factory=SitemapComparison)
     stats: Dict[str, Any] = field(default_factory=dict)
 
@@ -450,6 +451,33 @@ def _check_sitemap(
         )
 
 
+def _check_rendering(store: CrawlStore, session_id: int, report: SiteReport) -> None:
+    """Flag pages whose content is assembled in the browser.
+
+    Without this, a client-rendered site reports as having no headings and no content, and an
+    SEO team would spend its time fixing findings that describe this tool's blind spot rather
+    than the site. The caveat has to travel with the results.
+    """
+    rows = store.rows_where(session_id, "client_rendered = 1")
+    report.client_rendered = [row["url"] for row in rows]
+
+    for row in rows:
+        report.findings.append(
+            _finding(
+                "site.javascript-rendered",
+                Severity.HIGH,
+                f"Content appears to be rendered in the browser: {row['url']}",
+                detail=row["render_note"] or "",
+                recommendation="This audit reads the HTML the server sends, which is what a "
+                "crawler sees before scripts run. Treat this page's other findings with "
+                "caution — missing headings or thin content here may simply be content this "
+                "tool cannot see. Confirm with Google Search Console's URL Inspection, which "
+                "shows the rendered DOM.",
+                meta={"url": row["url"]},
+            )
+        )
+
+
 # --- entry point -----------------------------------------------------------------------
 
 
@@ -471,6 +499,7 @@ def analyse(
     _check_broken_links(store, session_id, settings, report)
     _check_indexability(store, session_id, report)
     _check_sitemap(store, session_id, settings, sitemap_report, report)
+    _check_rendering(store, session_id, report)
 
     report.stats.update(
         {
@@ -482,6 +511,7 @@ def analyse(
             "redirects": len(report.redirects),
             "orphans": len(report.orphans),
             "site_findings": len(report.findings),
+            "client_rendered": len(report.client_rendered),
         }
     )
 

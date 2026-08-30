@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS crawl_url (
     score             REAL,
     issue_count       INTEGER NOT NULL DEFAULT 0,
     in_sitemap        INTEGER NOT NULL DEFAULT 0,
+    client_rendered   INTEGER NOT NULL DEFAULT 0,
+    render_note       TEXT,
     error             TEXT,
     audited_at        TEXT,
     result_json       TEXT,
@@ -285,7 +287,10 @@ class CrawlStore:
 
     # Columns declared NOT NULL: passing an explicit None would be rejected, because a
     # column DEFAULT only applies when the column is left out of the statement entirely.
-    _NOT_NULL_DEFAULTS = {"depth": 0, "redirect_hops": 0, "issue_count": 0, "in_sitemap": 0}
+    _NOT_NULL_DEFAULTS = {
+        "depth": 0, "redirect_hops": 0, "issue_count": 0, "in_sitemap": 0,
+        "client_rendered": 0,
+    }
 
     def add_url(self, session_id: int, record: Dict[str, Any]) -> int:
         """Write one crawled URL. Re-crawling the same key updates the existing row."""
@@ -295,7 +300,8 @@ class CrawlStore:
             "title_length", "meta_description", "meta_length", "h1", "h1_count",
             "canonical", "indexable", "robots_directives", "word_count", "internal_links",
             "external_links", "images", "missing_alt", "hreflang", "schema_types",
-            "score", "issue_count", "in_sitemap", "error", "audited_at", "result_json",
+            "score", "issue_count", "in_sitemap", "client_rendered", "render_note",
+            "error", "audited_at", "result_json",
         ]
         values = []
         for name in columns:

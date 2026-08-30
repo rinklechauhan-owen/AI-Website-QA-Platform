@@ -5,7 +5,9 @@ AI-powered website QA, design review, content review, and automated bug reportin
 Enter a URL, optionally attach a design file and a content document, and the platform crawls
 the site, runs technical audits, applies AI review passes, and produces a client-ready report.
 
-Full product spec: [docs/PRD.md](docs/PRD.md) &nbsp;·&nbsp; Overview: [docs/SUMMARY.md](docs/SUMMARY.md) &nbsp;·&nbsp; Full record: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+**Using it?** Start with the [SEO team guide](docs/SEO-TEAM-GUIDE.md).
+
+Spec: [docs/PRD.md](docs/PRD.md) &nbsp;·&nbsp; Overview: [docs/SUMMARY.md](docs/SUMMARY.md) &nbsp;·&nbsp; Full record: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ---
 
@@ -116,7 +118,7 @@ Two layers, at different maturities. Being explicit about which is which:
 
 | Layer | State |
 | --- | --- |
-| [`audit`](audit/) — engine, crawler, CLI, and web UI | **Working.** Single-page audit and full-site crawler; 55 rules; dashboard UI; 529 tests |
+| [`audit`](audit/) — engine, crawler, CLI, and web UI | **Working.** Single-page audit and full-site crawler; 55 rules; dashboard UI; 544 tests |
 | [`services/api/`](services/api/) — FastAPI + Celery service | **Scaffold.** Models, schemas, task orchestration, and migrations wired; audit modules are registered stubs |
 | [`apps/web/`](apps/web/) — Next.js dashboard | **Scaffold.** Layout, typed API client, and scan form; no report views yet |
 
@@ -162,6 +164,15 @@ identical results with no duplicated rule logic.
 **Crawls are never saved.** They live in memory while the tool is open, with no database file,
 no accounts and no login. Export to CSV to keep anything. Measured on a real 2,000-page crawl:
 64 seconds at 31 URL/s, 19.7 MB of memory, 10.1 KB per page.
+
+**JavaScript-rendered sites.** The tool reads served HTML, which is what a crawler sees
+before scripts run. It detects pages whose content is assembled in the browser and shows a
+banner saying how many, so a rendering blind spot is never mistaken for an SEO problem.
+Detection is conservative and needs several corroborating signals — verified not to fire on
+server-rendered Next.js sites like react.dev or vercel.com.
+
+**Politeness.** robots.txt is obeyed by default, including `Crawl-delay`, enforced site-wide
+rather than per worker so concurrency cannot multiply the request rate back up.
 
 Site-wide checks that a single-page audit cannot make: duplicate titles, descriptions and H1s;
 orphan pages; pages with almost no internal links; redirect chains and links pointing at them;
@@ -243,7 +254,7 @@ can't be mistaken for a full audit.
 
 ## Tests
 
-529 tests, standard library `unittest`, no network access required:
+544 tests, standard library `unittest`, no network access required:
 
 ```bash
 python -m unittest discover -s tests -t . -v
